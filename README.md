@@ -77,6 +77,8 @@ python scripts/train.py
 Below is the output of `scripts/demo.py`. Notice how the **Fake** image (right) has distinct high-frequency energy patterns compared to the **Real** image (left), even though they look identical to the naked eye.
 
 ![DCT Proof](assets/dct_proof.png)
+<img width="2544" height="1174" alt="proof of the model running" src="https://github.com/user-attachments/assets/dc90273f-338d-4af4-a0ec-814c939ec847" />
+
 
 ## 📜 Citation
 
