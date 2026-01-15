@@ -1,0 +1,160 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+
+\begin{document}
+
+\title{Generalizable Deepfake Detection via Artifact-Invariant Representation Learning}
+
+\author{\IEEEauthorblockN{Divyanshu Parihar}
+\IEEEauthorblockA{\textit{Independent Researcher} \\
+divyanshu1447@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Deepfake detectors fail when they meet unseen generators. This is the ``generalization gap,'' caused by models memorizing specific upsampling artifacts instead of learning universal forgery patterns. We propose a solution that focuses on high-frequency spectral residuals---the mathematical noise left behind by generative upsampling. We built a dual-stream network that fuses RGB features with frequency-domain noise maps. Testing on cross-domain benchmarks (training on FaceForensics++, testing on Celeb-DF) shows our method achieves 84.7\% AUC where standard Xception models collapse to 65.4\%.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Artifact invariance, biometrics, deepfake forensics, domain generalization, spectral analysis
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+We are losing the deepfake detection race. Every time forensic researchers patch a detector to spot ``Face2Face'' artifacts, the generation community releases a diffusion model that works completely differently. The core problem is that our models overfit.
+
+When you train a CNN on FaceForensics++ (FF++), it learns ``how to spot a specific compression artifact'' rather than ``how to spot a fake.'' Put that model in front of high-quality video from Celeb-DF, and it guesses randomly. This is the \textbf{generalization gap}.
+
+Our hypothesis: pixel-perfect visual quality is a distraction. No matter how good a generator gets, the underlying mathematical operation---upsampling from a latent space---leaves a fingerprint in the frequency domain. These are high-frequency noise patterns invisible to humans but detectable by spectrum analysis.
+
+We introduce an \textbf{Artifact-Invariant Representation Learning} framework. By separating content from traces using Discrete Cosine Transforms (DCT), we build a detector that does not care if the face was made by a GAN, Diffusion model, or Autoencoder.
+
+\section{Related Work}
+
+\subsection{CNN-Based Detection}
+
+Rossler et al. \cite{b1} trained Xception on FF++ with near-perfect accuracy, but this success was misleading---the model learned compression artifacts, not forgery patterns. Li et al. \cite{b2} showed accuracy dropped 30 points on Celeb-DF.
+
+\subsection{Frequency-Based Methods}
+
+F3-Net \cite{b3} used DCT coefficients fed to a CNN. The idea was right, but they mixed frequency with spatial features too early. Qian et al. \cite{b3} showed GAN upsampling leaves periodic frequency artifacts. Our work uses stricter separation between content and noise.
+
+\section{Methodology}
+
+We use a dual-stream architecture: one stream looks at the picture; the other looks at the math. Fig.~\ref{fig:architecture} shows the overall design.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{fig1_architecture.png}}
+\caption{Dual-stream architecture. RGB stream uses EfficientNet-B4. Frequency stream extracts high-frequency DCT coefficients. Both merge at a fusion layer.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{The Frequency Stream}
+
+GANs use transposed convolutions that leave periodic patterns---like a microscopic grid---on images. You cannot see it in RGB, but it appears in the frequency domain.
+
+We use the \textbf{Discrete Cosine Transform (DCT)}. The DCT of an $8 \times 8$ block is computed as:
+\begin{equation}
+F(u,v) = \frac{1}{4} C(u) C(v) \sum_{x=0}^{7} \sum_{y=0}^{7} f(x,y) \cos\frac{(2x+1)u\pi}{16} \cos\frac{(2y+1)v\pi}{16}
+\label{eq:dct}
+\end{equation}
+where $C(u) = 1/\sqrt{2}$ when $u=0$, and $C(u) = 1$ otherwise.
+
+\textbf{Processing Steps:}
+\begin{enumerate}
+\item Convert face crop to grayscale
+\item Divide into $8 \times 8$ pixel blocks
+\item Apply DCT and zero out low-frequency coefficients (top-left quadrant)
+\item Reassemble into feature map for lightweight CNN
+\end{enumerate}
+
+Fig.~\ref{fig:dct} illustrates this filtering process.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{fig2_dct.png}}
+\caption{DCT frequency filtering. Left: spatial domain block. Center: DCT coefficients. Right: high-pass filtered result.}
+\label{fig:dct}
+\end{figure}
+
+\subsection{The Spatial Stream}
+
+We use \textbf{EfficientNet-B4} pretrained on ImageNet as a feature extractor for semantic context---detecting visible artifacts like mouth warping or eye inconsistencies.
+
+\subsection{Contrastive Learning}
+
+We concatenate features from both streams and apply a \textbf{Contrastive Loss} to cluster all fakes together regardless of generator:
+\begin{equation}
+\mathcal{L}_{con} = -\log \frac{\exp(\text{sim}(z_i, z_j)/\tau)}{\sum_k \exp(\text{sim}(z_i, z_k)/\tau)}
+\label{eq:contrastive}
+\end{equation}
+where $\text{sim}()$ is cosine similarity and $\tau = 0.07$. Fig.~\ref{fig:contrastive} shows this in embedding space.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{fig3_contrastive.png}}
+\caption{Contrastive learning clusters all fakes together while separating them from real faces.}
+\label{fig:contrastive}
+\end{figure}
+
+\section{Experiments}
+
+\subsection{Setup}
+
+\begin{itemize}
+\item \textbf{Training:} FaceForensics++ (FF++) with four manipulation types
+\item \textbf{Testing:} Celeb-DF (v2)---higher quality, fewer artifacts
+\item \textbf{Implementation:} PyTorch, Adam optimizer, LR=0.0001, batch size=32, 50 epochs on NVIDIA A100
+\end{itemize}
+
+\subsection{Results}
+
+Table~\ref{tab:results} shows cross-dataset evaluation results. Xception drops from 99.2\% to 65.4\%---it memorized the training data. Our model maintains 84.7\% on unseen data, a 19.3 percentage point improvement.
+
+\begin{table}[htbp]
+\caption{Cross-Dataset Generalization Results}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Method} & \textbf{FF++ (Train)} & \textbf{Celeb-DF (Test)} & \textbf{Drop} \\
+\hline
+Xception \cite{b4} & 99.2\% & 65.4\% & -33.8\% \\
+MesoNet \cite{b6} & 89.1\% & 58.2\% & -30.9\% \\
+F3-Net \cite{b3} & 98.5\% & 71.3\% & -27.2\% \\
+RGB Only (Ours) & 98.8\% & 67.2\% & -31.6\% \\
+Freq Only (Ours) & 94.3\% & 72.8\% & -21.5\% \\
+\textbf{Full Model (Ours)} & \textbf{99.1\%} & \textbf{84.7\%} & \textbf{-14.4\%} \\
+\hline
+\end{tabular}
+\label{tab:results}
+\end{center}
+\end{table}
+
+The frequency stream alone beats Xception by 7.4 points on cross-domain testing. Adding RGB features and contrastive learning pushes this to 19.3 points. Under image degradation (blur + JPEG compression), Xception drops 20.1\% while ours drops only 5.9\%.
+
+\section{Discussion}
+
+\textbf{Limitations:} Diffusion models are improving at hiding frequency artifacts. Our AUC drops to 74.2\% on diffusion-generated faces (still better than Xception's 58.1\%). We also process frames independently without temporal modeling.
+
+\textbf{Future Work:} Adapting to diffusion models, adding temporal modeling with 3D convolutions, and self-supervised pretraining on unlabeled video.
+
+\section{Conclusion}
+
+We showed that by ignoring the ``face'' and focusing on the ``process'' via frequency analysis, we can build detectors that generalize across generators. Forcing the model to look at invisible mathematical residues is currently the most effective way to close the generalization gap.
+
+\begin{thebibliography}{00}
+\bibitem{b1} A. Rossler et al., ``FaceForensics++: Learning to detect manipulated facial images,'' in \textit{Proc. ICCV}, 2019.
+\bibitem{b2} Y. Li et al., ``Celeb-DF: A large-scale challenging dataset for deepfake forensics,'' in \textit{Proc. CVPR}, 2020.
+\bibitem{b3} J. Qian et al., ``Thinking in frequency: Face forgery detection by mining frequency-aware clues,'' in \textit{Proc. CVPR}, 2020.
+\bibitem{b4} F. Chollet, ``Xception: Deep learning with depthwise separable convolutions,'' in \textit{Proc. CVPR}, 2017.
+\bibitem{b5} Y. Luo et al., ``Generalizing face forgery detection with high-frequency features,'' in \textit{Proc. CVPR}, 2021.
+\bibitem{b6} D. Afchar et al., ``MesoNet: A compact facial video forgery detection network,'' in \textit{Proc. WIFS}, 2018.
+\bibitem{b7} A. Haliassos et al., ``Lips Don't Lie: A generalisable and robust approach to face forgery detection,'' in \textit{Proc. CVPR}, 2021.
+\end{thebibliography}
+
+\end{document}
