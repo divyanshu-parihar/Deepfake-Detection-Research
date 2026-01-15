@@ -1,9 +1,13 @@
 #!/bin/bash
-# Activates the virtual environment and runs the pipeline
+# Script to compile the research paper
+# Requires pdflatex
 
-# Get the directory of the script
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOT_DIR="$DIR/.."
-
-source "$ROOT_DIR/.venv/bin/activate"
-python3 "$ROOT_DIR/src/research_pipeline.py"
+if command -v pdflatex &> /dev/null; then
+    echo "Compiling LaTeX..."
+    pdflatex -interaction=nonstopmode paper/deepfake_paper.tex
+    pdflatex -interaction=nonstopmode paper/deepfake_paper.tex # Run twice for references
+    echo "Done! Output is deepfake_paper.pdf"
+else
+    echo "Error: pdflatex not found. Please install a LaTeX distribution (e.g., MacTeX)."
+    echo "The .tex file has been updated successfully."
+fi
