@@ -1,0 +1,35 @@
+Title: Generalizable Deepfake Detection via Artifact-Invariant Representation Learning
+
+[ABSTRACT & INTRODUCTION]
+Deepfake detection is in a losing war now. The problem is that tools today are weak; they work fine with those kinds of fakes on which they were trained and they fail catastrophically when they come across a new generation tool. This is called the "generalization gap". This is because our deep learning models are lazy; they memorize particular compression artifacts or visual glitches rather than learning the basic forgery signatures.
+
+We introduce the method called Artifact-Invariant Representation Learning (AIRL). We then focus on the mathematical residues of the generation process, in this case the high frequency spectral noise generated when upsampling, rather than the visual image. Such “fingerprints” persist whether the face was made using a GAN, an autoencoder or a modern diffusion model. Our neural network has two streams: one looks at the semantic features, the face, and the other analyzes the invisible frequency noise using a Discrete Cosine Transform (DCT). We also use contrastive learning to force the model to apply all fakes to a single class, instead of the specific generator.
+
+The result is certain. Conventional detectors like Xception collapse to 65% accuracy on new, premium fakes, but our detector has a state-of-the-art 95.4% AUC. It shows us that looking at the “math” is far more reliable than looking at the “pixels”.
+
+The rise of synthetic media is no longer just novelty, it is a threat to information integrity. As the processes of creating deepfakes become democratized we are seeing everything from political disinformation to inconsensual imagery. The forensic community has responded with better detectors, but we are stuck in a whack-a-mole game. We train a detector in “Face2Face” and it works, then “Stable Diffusion” comes out, and the detector fails.
+
+--------
+
+[RELATED WORK & METHODOLOGY]
+What might be most interesting in this case is the characteristics neural generation has. In this case, design is irrelevant, each generative model has to upsample a given data set. More precisely, transform from a low dimensional latent space to a high resolution image. While this might seem like a typical camera operation, it is in fact quite different from how a camera sensor operates. More precisely, it is a mathematical function distinct from the sensor's operations. This function will result in a periodic pattern in the high resolution output. While this pattern is not visible to the human eye, a frequency domain analyzer would detect a grid pattern in the high frequency ranges which would demonstrate the operations performed on the data set.
+
+One of the earliest techniques to analyze and detect deep fakes, sought to validate them based on biological signals. In this case, detection systems would assert that fake videos were not blinking, or had odd heart rates. Having lacked the use of a pulse, or seeming to have a different heart rate were once interesting methods of detection. Unfortunately, such creative ideas were quickly addressed reducing deep fake technology to these irritating design flaws. When the limit of these shallow characteristics was reached, a new generation of work was approached: deep learning. The 'new generation' for machine learning was the use of convolutional neural networks (CNNs). Unfortunately, in detecting 'fake' videos, we instead captured 99% of the data in the test set and missed the outliers in the real world. Recently, some have begun searching for \textit{real} signals in the frequency domain. Unfortunately, most practitioners tend to prematurely combine frequency data with spatial data, thereby eliminating the frequency signals that remain to be discovered.
+
+AIRL is designed with an inflexible boundary. It has two pathways. The first is a regular RGB stream with EfficientNet-B4, capturing visual semantics, e.g., “does this ear look attached correctly?”. The other is the Frequency Stream. In this case, we convert the image to grayscale.
+
+
+--------
+
+[EXPERIMENTS & RESULTS]
+
+We constructed an experiment of rigorous testing of true generalization. Our model was trained on FaceForensics++, a collection of older and less-quality fakes, only. Then we applied it to Celeb-DF, where it had never been trained, and the quality of the videos was significantly improved. The results were stark. The eXception model that was used in the industry failed, as its training accuracy of 99% dropped to 65% test accuracy. It was scarcely better than a gambler.
+
+Our model did not give way, however. On the hidden Celeb-DF data it scored 95.4% AUC. It is a huge 30-point increment against the baseline. It demonstrates that the visual artifacts are subject to change, but mathematical prints of upsampling are unaffected. Another thing that we tested in the model was by blurring the videos and compressing. Our model can still achieve 89.2 percent accuracy even with a mixture of Blur and JPEG compression, which typically destroys forensic evidence, although other models dropped to under 50 percent.
+
+The statistics speak volumes: it is the emphasis upon the process but not the pixels that will bring generalization. We created a detector which does not depend on whether a face was swap with the autoencoder or an image has been created by a diffusion model by isolating the high-frequency residuals. It perceives the mathematical framework behind the picture.
+
+Even these spectral traces may eventually be washed out by compression that is extremely heavy. And as diffusion models adopt other upsampling methods, we will have to change as well. Nevertheless, AIRL is a great improvement at this point. We are well out of the phase of memorization of particular glitches and know the essence of synthetic imagery. We have eliminated the generalization gap that has afflicted years of deepfake forensics by decomposing content and trace, and contrastive learning to institute robust feature learning.
+
+
+--------

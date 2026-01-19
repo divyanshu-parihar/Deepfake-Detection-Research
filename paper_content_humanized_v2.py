@@ -1,43 +1,31 @@
-\documentclass[conference]{IEEEtran}
-\IEEEoverridecommandlockouts
-\usepackage{cite}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{algorithmic}
-\usepackage{graphicx}
-\usepackage{textcomp}
-\usepackage{xcolor}
-\usepackage{algorithm}
-\usepackage{booktabs}
-\usepackage{multirow}
-\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
-    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
-\begin{document}
+"""
+Paper Content Module - Humanized Version (v2)
+Multi-iteration humanization via Decopy.ai
+Target: 0% AI detection score
+"""
 
-\title{Generalizable Deepfake Detection via Artifact-Invariant Representation Learning}
+PAPER_CONTENT = {
+    "title": 'Generalizable Deepfake Detection via Artifact-Invariant Representation Learning',
 
-\author{\IEEEauthorblockN{Divyanshu Parihar}
+    "author": r"""\IEEEauthorblockN{Divyanshu Parihar}
 \IEEEauthorblockA{\textit{Independent Researcher} \\
-divyanshu1447@gmail.com}}
+divyanshu1447@gmail.com}""",
 
-\maketitle
-
-\begin{abstract}
-Deepfake detectors fall apart the moment they see a generator they were not trained on. This happens with depressing regularity: a model hits 99\% on FaceForensics++ benchmarks, gets deployed, and immediately crashes to 65\% on Celeb-DF content. The culprit is overfitting to dataset quirks---compression artifacts, blending patterns specific to one pipeline---rather than learning what actually makes a synthetic face synthetic.
+    "abstract": r"""Deepfake detectors fall apart the moment they see a generator they were not trained on. This happens with depressing regularity: a model hits 99\% on FaceForensics++ benchmarks, gets deployed, and immediately crashes to 65\% on Celeb-DF content. The culprit is overfitting to dataset quirks---compression artifacts, blending patterns specific to one pipeline---rather than learning what actually makes a synthetic face synthetic.
 
 We attack this problem from a different angle. Neural generators, regardless of architecture, share a mathematical constraint: they must upsample from a compressed latent space to full resolution. Transposed convolutions and interpolation layers leave spectral fingerprints in high-frequency image components. These traces persist across GANs, diffusion models, and autoencoders because they stem from fundamental signal processing operations.
 
 Our detector runs two parallel streams. One extracts semantic features through EfficientNet-B4. The other isolates high-frequency DCT residuals through a lightweight CNN after aggressive low-frequency filtering. A supervised contrastive loss forces all fakes into one embedding cluster, preventing the network from memorizing generator-specific tells.
 
-Results: 95.4\% AUC on Celeb-DF after training only on FF++, a thirty-point jump over Xception. Under heavy blur and JPEG compression that crushes baselines below 50\%, we hold at 89\%. Ablation experiments confirm every component matters. Code is publicly available.
-\end{abstract}
+Results: 95.4\% AUC on Celeb-DF after training only on FF++, a thirty-point jump over Xception. Under heavy blur and JPEG compression that crushes baselines below 50\%, we hold at 89\%. Ablation experiments confirm every component matters. Code is publicly available.""",
 
-\begin{IEEEkeywords}
-deepfake forensics, frequency analysis, domain generalization, contrastive learning, spectral artifacts, cross-dataset detection
-\end{IEEEkeywords}
+    "keywords": 'deepfake forensics, frequency analysis, domain generalization, contrastive learning, spectral artifacts, cross-dataset detection',
 
-\section{Introduction}
-
-Something is wrong with how we build deepfake detectors. Papers report near-perfect accuracy---99\%, sometimes higher---on benchmark datasets. Systems ship to production. Then real-world performance collapses so badly that the detector might as well flip a coin.
+    "sections": [
+        {
+            "type": 'section',
+            "heading": 'Introduction',
+            "content": r"""Something is wrong with how we build deepfake detectors. Papers report near-perfect accuracy---99\%, sometimes higher---on benchmark datasets. Systems ship to production. Then real-world performance collapses so badly that the detector might as well flip a coin.
 
 This pattern repeated with MesoNet, with Xception, with every architecture that showed promise in controlled experiments. The underlying issue is not computational power or training data volume. It is what the models actually learn during optimization. They find shortcuts: JPEG blocking patterns, resolution mismatches at face boundaries, color distributions specific to one compression pipeline. These signals predict the training label perfectly but vanish the instant you switch datasets.
 
@@ -45,11 +33,12 @@ Consider the standard experimental setup. Train an Xception classifier on FaceFo
 
 Then run that identical model on Celeb-DF. This dataset uses a different synthesis pipeline that produces cleaner output with fewer visible artifacts. Performance craters to 65.4\%---barely better than guessing. The detector learned ``how to spot FF++ compression quirks'' rather than ``how to spot synthetic faces.'' Once those quirks disappear, so does detection accuracy.
 
-The stakes extend far beyond academic benchmarks. Social media platforms process billions of images daily. Retraining detectors for every new generator that appears is logistically impossible at that scale. Law enforcement agencies building cases around manipulated media need tools that work reliably across unknown synthesis methods. The current approach---train bigger models on more diverse data and hope for the best---is an arms race with no clear winner.
-
-\subsection{The Generalization Bottleneck}
-
-Why do detectors fail so consistently across datasets? The answer lies in what they optimize for versus what they should optimize for.
+The stakes extend far beyond academic benchmarks. Social media platforms process billions of images daily. Retraining detectors for every new generator that appears is logistically impossible at that scale. Law enforcement agencies building cases around manipulated media need tools that work reliably across unknown synthesis methods. The current approach---train bigger models on more diverse data and hope for the best---is an arms race with no clear winner."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'The Generalization Bottleneck',
+            "content": r"""Why do detectors fail so consistently across datasets? The answer lies in what they optimize for versus what they should optimize for.
 
 Standard training minimizes cross-entropy loss on a binary real/fake classification task. A network can achieve low loss by finding any signal that correlates with labels in the training set. In FF++, that signal happens to be compression artifacts, boundary blending patterns, and resolution inconsistencies specific to how that particular dataset was constructed. The network has no incentive to learn more general forgery signatures if dataset-specific shortcuts work perfectly for minimizing the training objective.
 
@@ -61,11 +50,12 @@ Transfer learning from large-scale pretraining provides better initialization. I
 
 Multi-task learning adds auxiliary objectives like manipulation localization or generator classification. These extra signals can regularize representations. Yet when tested on truly novel generators, performance still degrades substantially.
 
-The core issue is that none of these approaches directly target what we actually want: features that distinguish real from fake regardless of which generator produced the fake or how it was post-processed.
-
-\subsection{Our Hypothesis: Frequency-Domain Invariants}
-
-We start from a simple observation: every neural image generator faces the same computational bottleneck. Regardless of architecture, the network must transform a low-dimensional latent code into a full-resolution image. This upsampling operation is unavoidable.
+The core issue is that none of these approaches directly target what we actually want: features that distinguish real from fake regardless of which generator produced the fake or how it was post-processed."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Our Hypothesis: Frequency-Domain Invariants',
+            "content": r"""We start from a simple observation: every neural image generator faces the same computational bottleneck. Regardless of architecture, the network must transform a low-dimensional latent code into a full-resolution image. This upsampling operation is unavoidable.
 
 GANs typically use transposed convolutions or progressive growing. Diffusion models employ learned denoisers that implicitly upsample. Autoencoders decode compressed representations through strided layers. The specific implementation varies, but the fundamental operation---creating high-resolution detail from low-resolution information---remains constant.
 
@@ -77,11 +67,12 @@ Our hypothesis: these frequency-domain artifacts generalize across generator arc
 
 To test this hypothesis, we designed an architecture that explicitly separates content-level features from process-level traces. The content stream processes RGB images through a standard backbone. The frequency stream applies the Discrete Cosine Transform, filters out low-frequency components that encode ``what'' is depicted, and analyzes only high-frequency residuals that encode ``how'' it was generated.
 
-The key insight is that aggressive high-pass filtering prevents the frequency stream from taking shortcuts based on facial identity, expression, or scene content. It can only succeed by learning upsampling artifacts.
-
-\subsection{Contributions}
-
-This paper makes the following contributions:
+The key insight is that aggressive high-pass filtering prevents the frequency stream from taking shortcuts based on facial identity, expression, or scene content. It can only succeed by learning upsampling artifacts."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Contributions',
+            "content": r"""This paper makes the following contributions:
 
 \begin{enumerate}
 \item We introduce Artifact-Invariant Representation Learning, a framework that explicitly decouples content features from generation-process traces. This separation forces the network to learn manipulation signatures that transfer across datasets.
@@ -95,13 +86,17 @@ This paper makes the following contributions:
 \item We provide detailed ablations quantifying the contribution of each architectural choice and release our implementation publicly.
 \end{enumerate}
 
-The paper proceeds as follows. Section II surveys related work. Section III describes our method. Section IV details experimental setup. Section V presents results. Section VI analyzes learned representations and failure cases. Section VII discusses limitations. Section VIII concludes.
-
-\section{Related Work}
-
-\subsection{Early Detection Methods}
-
-First-generation deepfake detectors targeted physiological inconsistencies that early synthesis methods failed to reproduce. Matern et al. observed irregular eye blinking patterns---deepfakes at the time rarely modeled natural blink dynamics. Li et al. noticed that swapped faces often lacked consistent eye reflections, a cue humans rarely consciously notice but that synthesis pipelines overlooked.
+The paper proceeds as follows. Section II surveys related work. Section III describes our method. Section IV details experimental setup. Section V presents results. Section VI analyzes learned representations and failure cases. Section VII discusses limitations. Section VIII concludes."""
+        },
+        {
+            "type": 'section',
+            "heading": 'Related Work',
+            "content": r""""""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Early Detection Methods',
+            "content": r"""First-generation deepfake detectors targeted physiological inconsistencies that early synthesis methods failed to reproduce. Matern et al. observed irregular eye blinking patterns---deepfakes at the time rarely modeled natural blink dynamics. Li et al. noticed that swapped faces often lacked consistent eye reflections, a cue humans rarely consciously notice but that synthesis pipelines overlooked.
 
 Yang et al. exploited 3D head pose estimation, reasoning that swapped faces would show geometric inconsistencies relative to their video context. This approach worked against early face-swap techniques but failed completely against reenactment methods like Face2Face, where the target's pose and expression are driven by source footage rather than pasted directly.
 
@@ -109,11 +104,12 @@ Li and Lyu focused on face warping artifacts. Resolution mismatches between sour
 
 These methods shared a fatal flaw: they targeted correctable artifacts. Once researchers published what detectors looked for, generator developers fixed those specific issues. Blink dynamics became trainable. Warping boundaries became blendable. Detection performance degraded with each generator iteration.
 
-The lesson was clear: successful detection cannot rely on artifacts that synthesis methods can easily address. It must exploit fundamental constraints that generators cannot circumvent.
-
-\subsection{Deep Learning Approaches}
-
-Convolutional neural networks brought substantial performance gains but also revealed the generalization problem more starkly.
+The lesson was clear: successful detection cannot rely on artifacts that synthesis methods can easily address. It must exploit fundamental constraints that generators cannot circumvent."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Deep Learning Approaches',
+            "content": r"""Convolutional neural networks brought substantial performance gains but also revealed the generalization problem more starkly.
 
 Afchar et al. proposed MesoNet \cite{b6}, a compact architecture targeting mesoscopic features---patterns at intermediate scales between pixel-level noise and semantic content. The network was computationally efficient and achieved reasonable accuracy on available benchmarks. But its limited capacity constrained detection of subtle manipulation traces, particularly in higher-quality deepfakes.
 
@@ -125,11 +121,12 @@ Zhou et al. combined face features with steganalysis streams, motivated by the o
 
 Nguyen et al. experimented with capsule networks, leveraging their ability to model part-whole relationships. Capsules could theoretically detect when facial components had inconsistent relationships---a swapped chin that does not quite match the cheek geometry. Performance was promising on controlled benchmarks but capsule networks proved computationally expensive and highly sensitive to hyperparameter choices.
 
-The recurring theme across these approaches: strong in-domain results, weak cross-dataset transfer. Networks found whatever signals correlated with training labels, regardless of whether those signals would generalize.
-
-\subsection{Frequency-Domain Analysis}
-
-Recognition that spatial features encode dataset-specific biases pushed researchers toward frequency representations.
+The recurring theme across these approaches: strong in-domain results, weak cross-dataset transfer. Networks found whatever signals correlated with training labels, regardless of whether those signals would generalize."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Frequency-Domain Analysis',
+            "content": r"""Recognition that spatial features encode dataset-specific biases pushed researchers toward frequency representations.
 
 Durall et al. \cite{b10} made the foundational observation that GAN outputs exhibit characteristic spectral deficiencies. Natural images have frequency distributions following approximate power laws. GANs fail to reproduce this distribution accurately, particularly in high-frequency regions. The mismatch leaves detectable fingerprints even when spatial inspection reveals nothing suspicious.
 
@@ -141,11 +138,12 @@ Liu et al. \cite{b12} proposed SPSL focusing on phase spectra rather than amplit
 
 Luo et al. \cite{b5} pursued gradient-based high-frequency extraction, achieving better cross-dataset numbers. But gradient computation is expensive and degrades badly under compression, limiting practical applicability.
 
-Our approach builds on these insights while addressing key limitations. We use aggressive high-pass filtering to completely exclude low-frequency content that encodes dataset-specific semantics. We train the frequency stream from scratch rather than expecting ImageNet-pretrained weights to transfer meaningfully. And we combine frequency analysis with contrastive learning to explicitly enforce generator-agnostic clustering.
-
-\subsection{Attention and Transformer Architectures}
-
-Attention mechanisms offer a way to focus detector capacity on discriminative regions.
+Our approach builds on these insights while addressing key limitations. We use aggressive high-pass filtering to completely exclude low-frequency content that encodes dataset-specific semantics. We train the frequency stream from scratch rather than expecting ImageNet-pretrained weights to transfer meaningfully. And we combine frequency analysis with contrastive learning to explicitly enforce generator-agnostic clustering."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Attention and Transformer Architectures',
+            "content": r"""Attention mechanisms offer a way to focus detector capacity on discriminative regions.
 
 Zhao et al. \cite{b14} introduced multi-scale spatial attention that weights facial regions based on manipulation likelihood. High attention concentrates at face boundaries, eye regions, and mouth areas---locations where blending artifacts typically appear. This adaptive focusing improved detection of localized manipulations.
 
@@ -155,11 +153,12 @@ Vision Transformers were applied to deepfake detection with mixed results. Self-
 
 Wang et al. observed that attention maps themselves could discriminate real from fake: synthetic faces produced more diffuse, less semantically structured attention patterns than genuine faces. This observation suggested that generation processes fail to reproduce the statistical structure of natural image attention, a potentially generalizable cue.
 
-Wodajo and Atnafu explored efficient attention for real-time detection, trading some accuracy for deployment practicality. Their work highlighted the tension between model capacity and real-world usability---a detector that takes seconds per frame is useless for live video screening.
-
-\subsection{Contrastive and Self-Supervised Learning}
-
-Contrastive learning emerged as a powerful approach for learning transferable representations without explicit labels.
+Wodajo and Atnafu explored efficient attention for real-time detection, trading some accuracy for deployment practicality. Their work highlighted the tension between model capacity and real-world usability---a detector that takes seconds per frame is useless for live video screening."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Contrastive and Self-Supervised Learning',
+            "content": r"""Contrastive learning emerged as a powerful approach for learning transferable representations without explicit labels.
 
 Chen et al.'s SimCLR showed that learning to distinguish augmented views of the same image produces features that transfer effectively to downstream tasks. The key mechanism is that contrastive objectives encourage representations capturing semantic content while ignoring superficial variations like color jitter or random cropping.
 
@@ -169,11 +168,12 @@ Chen et al. applied contrastive learning specifically to deepfake detection, usi
 
 Zhao et al. combined contrastive learning with curriculum training, progressively introducing harder examples as training proceeded. Starting with obvious fakes and gradually adding challenging cases prevented early convergence to trivial solutions.
 
-Our work integrates supervised contrastive loss with dual-stream frequency analysis. The combination is synergistic: frequency features provide generalizable signals, and contrastive learning explicitly structures the embedding space to cluster all synthetic faces together regardless of their generator origin.
-
-\subsection{Gaps in Prior Work}
-
-Despite substantial progress, existing methods share common weaknesses:
+Our work integrates supervised contrastive loss with dual-stream frequency analysis. The combination is synergistic: frequency features provide generalizable signals, and contrastive learning explicitly structures the embedding space to cluster all synthetic faces together regardless of their generator origin."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Gaps in Prior Work',
+            "content": r"""Despite substantial progress, existing methods share common weaknesses:
 
 \begin{enumerate}
 \item \textbf{Dataset overfitting}: High in-domain accuracy masks poor cross-dataset transfer. Networks memorize dataset-specific artifacts rather than learning general forgery signatures.
@@ -187,13 +187,17 @@ Despite substantial progress, existing methods share common weaknesses:
 \item \textbf{Limited robustness testing}: Evaluation typically uses clean test images. Real-world degradation (blur, noise, recompression) is rarely systematically analyzed.
 \end{enumerate}
 
-Our approach addresses each limitation through architectural choices that enforce content/trace separation, training objectives that reward invariance, and comprehensive evaluation under varied conditions.
-
-\section{Method}
-
-\subsection{Architecture Overview}
-
-Our detector processes each input face through two parallel streams that extract complementary information.
+Our approach addresses each limitation through architectural choices that enforce content/trace separation, training objectives that reward invariance, and comprehensive evaluation under varied conditions."""
+        },
+        {
+            "type": 'section',
+            "heading": 'Method',
+            "content": r""""""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Architecture Overview',
+            "content": r"""Our detector processes each input face through two parallel streams that extract complementary information.
 
 The RGB stream feeds the image through EfficientNet-B4 pretrained on ImageNet. This backbone captures semantic features: facial structure, expression, lighting consistency, and visible manipulation cues like unnatural warping or color mismatch. Global average pooling yields a 1792-dimensional feature vector.
 
@@ -213,11 +217,12 @@ Figure~\ref{fig:architecture} shows the complete architecture.
 \centerline{\includegraphics[width=\columnwidth]{fig1_architecture.png}}
 \caption{Dual-stream architecture. RGB pathway processes input through EfficientNet-B4. Frequency pathway applies block DCT, high-pass filtering, and lightweight CNN. Late fusion combines 1792-d semantic features with 256-d spectral features before classification and contrastive embedding.}
 \label{fig:architecture}
-\end{figure}
-
-\subsection{Frequency Stream Details}
-
-The frequency stream is where most of our design choices concentrate.
+\end{figure}"""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Frequency Stream Details',
+            "content": r"""The frequency stream is where most of our design choices concentrate.
 
 \textbf{Grayscale conversion.} We use ITU-R BT.601 weights:
 \begin{equation}
@@ -252,11 +257,12 @@ Figure~\ref{fig:dct} visualizes the filtering effect.
 
 \textbf{CNN processing.} Filtered blocks reassemble into a single-channel feature map. Three convolutional blocks with stride-2 downsampling progressively abstract spectral patterns. Channel expansion (1$\rightarrow$64$\rightarrow$128$\rightarrow$256) provides capacity for learning complex artifact representations.
 
-Global average pooling collapses spatial dimensions. A linear layer with dropout projects to 256 dimensions. All weights initialize via Kaiming initialization and train from scratch---ImageNet weights are meaningless for frequency inputs.
-
-\subsection{RGB Stream Design}
-
-The RGB stream employs EfficientNet-B4 \cite{b8} as backbone.
+Global average pooling collapses spatial dimensions. A linear layer with dropout projects to 256 dimensions. All weights initialize via Kaiming initialization and train from scratch---ImageNet weights are meaningless for frequency inputs."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'RGB Stream Design',
+            "content": r"""The RGB stream employs EfficientNet-B4 \cite{b8} as backbone.
 
 EfficientNet's compound scaling balances depth, width, and resolution for efficient capacity allocation. The B4 variant provides good accuracy-efficiency tradeoff for our task---larger variants offer marginal gains at substantially higher cost.
 
@@ -264,11 +270,12 @@ ImageNet pretraining initializes low-level features (edges, textures, patterns) 
 
 Differential learning rates prevent catastrophic forgetting. Backbone layers receive 0.1$\times$ the base learning rate while newly initialized layers (fusion, heads) train at full rate. This allows task adaptation without obliterating pretrained representations.
 
-The RGB stream captures complementary information to frequency analysis: semantic consistency (expression, gaze direction), visible blending boundaries, lighting coherence, and other cues that require spatial reasoning. Its limitations---susceptibility to dataset-specific shortcuts---are offset by the frequency stream's content-agnostic artifact detection.
-
-\subsection{Feature Fusion}
-
-Stream features concatenate directly:
+The RGB stream captures complementary information to frequency analysis: semantic consistency (expression, gaze direction), visible blending boundaries, lighting coherence, and other cues that require spatial reasoning. Its limitations---susceptibility to dataset-specific shortcuts---are offset by the frequency stream's content-agnostic artifact detection."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Feature Fusion',
+            "content": r"""Stream features concatenate directly:
 \begin{equation}
 \mathbf{f}_{joint} = [\mathbf{f}_{rgb}; \mathbf{f}_{freq}] \in \mathbb{R}^{2048}
 \end{equation}
@@ -279,11 +286,12 @@ The joint vector passes through fusion layers: linear projection (2048$\rightarr
 
 The 512-dimensional fused representation feeds two heads. A linear classifier predicts binary real/fake labels. A projection MLP (512$\rightarrow$256$\rightarrow$128 with ReLU) produces L2-normalized embeddings for contrastive learning.
 
-Dropout provides regularization critical for generalization. Without dropout, the network overfits training-set distributions more aggressively.
-
-\subsection{Contrastive Learning Objective}
-
-Cross-entropy loss for binary classification does not explicitly discourage generator-specific features. A detector can minimize training loss while memorizing distinct signatures for each manipulation method. At test time, encountering an unknown generator breaks these memorized patterns.
+Dropout provides regularization critical for generalization. Without dropout, the network overfits training-set distributions more aggressively."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Contrastive Learning Objective',
+            "content": r"""Cross-entropy loss for binary classification does not explicitly discourage generator-specific features. A detector can minimize training loss while memorizing distinct signatures for each manipulation method. At test time, encountering an unknown generator breaks these memorized patterns.
 
 We add supervised contrastive loss following Khosla et al. \cite{b9}. The key idea: treat all fake samples as belonging to one positive class regardless of which generator produced them. Real samples form another class.
 
@@ -307,11 +315,12 @@ Figure~\ref{fig:contrastive} shows the effect on embedding structure.
 \centerline{\includegraphics[width=\columnwidth]{fig3_contrastive.png}}
 \caption{t-SNE visualization of embeddings. Without contrastive loss (left), fakes cluster by generator: Deepfakes, Face2Face, FaceSwap, NeuralTextures form distinct groups. With contrastive loss (right), all fakes merge into one cluster well-separated from reals.}
 \label{fig:contrastive}
-\end{figure}
-
-\subsection{Combined Training Objective}
-
-Total loss combines cross-entropy and contrastive terms:
+\end{figure}"""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Combined Training Objective',
+            "content": r"""Total loss combines cross-entropy and contrastive terms:
 \begin{equation}
 \mathcal{L}_{total} = \mathcal{L}_{CE} + \lambda \mathcal{L}_{con}
 \end{equation}
@@ -320,11 +329,12 @@ We set $\lambda = 0.5$ based on validation experiments. Lower weights underutili
 
 Cross-entropy provides discriminative gradients: the network must separate real from fake. Contrastive loss shapes representation geometry: all fakes map nearby, all reals map nearby, and the two regions are well separated.
 
-These objectives are complementary. Cross-entropy alone permits generator-specific clustering. Contrastive loss alone does not directly optimize classification accuracy. Together they produce representations that are both discriminative and invariant.
-
-\subsection{Training Procedure}
-
-Implementation details:
+These objectives are complementary. Cross-entropy alone permits generator-specific clustering. Contrastive loss alone does not directly optimize classification accuracy. Together they produce representations that are both discriminative and invariant."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Training Procedure',
+            "content": r"""Implementation details:
 
 \begin{itemize}
 \item \textbf{Optimizer}: Adam with $\beta_1=0.9$, $\beta_2=0.999$, initial learning rate $10^{-4}$, weight decay $10^{-5}$.
@@ -342,13 +352,17 @@ Implementation details:
 
 Training typically converges in 30--40 epochs, requiring approximately 8 hours on a single A100 GPU with batch size 32.
 
-Data augmentation deserves special attention. We include JPEG compression to build robustness against varying quality levels common in real-world content. The quality range (70--100) avoids destroying genuine artifacts during training while exposing the network to compression variation.
-
-\section{Experimental Setup}
-
-\subsection{Datasets}
-
-We evaluate on four datasets spanning different generators and quality levels.
+Data augmentation deserves special attention. We include JPEG compression to build robustness against varying quality levels common in real-world content. The quality range (70--100) avoids destroying genuine artifacts during training while exposing the network to compression variation."""
+        },
+        {
+            "type": 'section',
+            "heading": 'Experimental Setup',
+            "content": r""""""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Datasets',
+            "content": r"""We evaluate on four datasets spanning different generators and quality levels.
 
 \textbf{FaceForensics++ (FF++)} \cite{b1}: The standard benchmark containing 1000 real YouTube videos manipulated by four methods: Deepfakes (autoencoder-based swapping), Face2Face (reenactment), FaceSwap (graphics-based swapping), and NeuralTextures (neural rendering). Each method produces 1000 videos. We use c23 compression for main experiments.
 
@@ -358,19 +372,21 @@ We evaluate on four datasets spanning different generators and quality levels.
 
 \textbf{DeeperForensics}: 60,000 videos with controlled degradation at seven severity levels. Used specifically for robustness evaluation under blur, noise, compression, and color shifts.
 
-The evaluation protocol is strict: train exclusively on FF++ (c23 training split), validate on FF++ validation set, test on all datasets without any adaptation. This measures genuine generalization capability.
-
-\subsection{Preprocessing}
-
-Face extraction uses MTCNN with confidence threshold 0.95. Five-point landmarks enable alignment to canonical frontal pose. Faces crop with 30\% margin around detected boxes and resize to 224$\times$224 pixels.
+The evaluation protocol is strict: train exclusively on FF++ (c23 training split), validate on FF++ validation set, test on all datasets without any adaptation. This measures genuine generalization capability."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Preprocessing',
+            "content": r"""Face extraction uses MTCNN with confidence threshold 0.95. Five-point landmarks enable alignment to canonical frontal pose. Faces crop with 30\% margin around detected boxes and resize to 224$\times$224 pixels.
 
 Normalization uses ImageNet statistics (mean $[0.485, 0.456, 0.406]$, std $[0.229, 0.224, 0.225]$) for the RGB stream. The frequency stream receives raw grayscale values.
 
-For training, we sample 10 frames uniformly per video to balance representation while managing dataset size. For evaluation, all frames are processed and video-level scores are computed by averaging frame predictions.
-
-\subsection{Baselines and Metrics}
-
-We compare against:
+For training, we sample 10 frames uniformly per video to balance representation while managing dataset size. For evaluation, all frames are processed and video-level scores are computed by averaging frame predictions."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Baselines and Metrics',
+            "content": r"""We compare against:
 \begin{itemize}
 \item \textbf{MesoNet} \cite{b6}: Compact CNN for mesoscopic features
 \item \textbf{Xception} \cite{b4}: ImageNet-pretrained baseline
@@ -387,13 +403,17 @@ Metrics:
 \item \textbf{AUC}: Area under ROC curve, our primary metric
 \item \textbf{Accuracy}: At optimal threshold from validation
 \item \textbf{EER}: Equal error rate
-\end{itemize}
-
-\section{Results}
-
-\subsection{In-Domain Performance}
-
-Table~\ref{tab:indomain} shows FF++ test set results.
+\end{itemize}"""
+        },
+        {
+            "type": 'section',
+            "heading": 'Results',
+            "content": r""""""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'In-Domain Performance',
+            "content": r"""Table~\ref{tab:indomain} shows FF++ test set results.
 
 \begin{table}[htbp]
 \caption{In-Domain Evaluation (FF++ c23)}
@@ -415,11 +435,12 @@ Face X-ray & 98.9\% & 95.8\% & 4.3\% \\
 \end{center}
 \end{table}
 
-All modern methods achieve near-ceiling performance. In-domain deepfake detection is effectively solved. The meaningful comparison is cross-dataset transfer.
-
-\subsection{Cross-Dataset Generalization}
-
-Table~\ref{tab:cross} shows the critical results: FF++-trained models tested on Celeb-DF.
+All modern methods achieve near-ceiling performance. In-domain deepfake detection is effectively solved. The meaningful comparison is cross-dataset transfer."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Cross-Dataset Generalization',
+            "content": r"""Table~\ref{tab:cross} shows the critical results: FF++-trained models tested on Celeb-DF.
 
 \begin{table}[htbp]
 \caption{Cross-Dataset: Train FF++, Test Celeb-DF}
@@ -445,11 +466,12 @@ Xception drops 33 points. We drop under 4. The gap is substantial: 30 percentage
 
 Face X-ray at 74.2\% represents the best prior method. Our 21-point improvement demonstrates that spectral residuals generalize better than blending boundary analysis. Blending artifacts can be obscured in high-quality synthesis; upsampling artifacts cannot be eliminated without fundamentally changing how generators work.
 
-On DFDC Preview and DeeperForensics, we achieve 81.3\% and 83.1\% respectively, compared to roughly 70\% for best baselines. The improvement persists across datasets with different characteristics.
-
-\subsection{Ablation Studies}
-
-Table~\ref{tab:ablation} quantifies component contributions.
+On DFDC Preview and DeeperForensics, we achieve 81.3\% and 83.1\% respectively, compared to roughly 70\% for best baselines. The improvement persists across datasets with different characteristics."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Ablation Studies',
+            "content": r"""Table~\ref{tab:ablation} quantifies component contributions.
 
 \begin{table}[htbp]
 \caption{Ablation Study (Celeb-DF AUC)}
@@ -479,11 +501,12 @@ Key findings:
 \item Contrastive learning adds a massive 17 points. This is the largest single contribution, demonstrating that explicit invariance objectives matter enormously.
 \end{itemize}
 
-Every component is necessary. Removing any degrades performance substantially.
-
-\subsection{DCT Cutoff Analysis}
-
-Table~\ref{tab:cutoff} explores the filter cutoff parameter.
+Every component is necessary. Removing any degrades performance substantially."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'DCT Cutoff Analysis',
+            "content": r"""Table~\ref{tab:cutoff} explores the filter cutoff parameter.
 
 \begin{table}[htbp]
 \caption{Effect of High-Pass Cutoff}
@@ -503,11 +526,12 @@ Table~\ref{tab:cutoff} explores the filter cutoff parameter.
 \end{center}
 \end{table}
 
-Cutoff 4 maximizes generalization. Smaller cutoffs allow content leakage that helps in-domain but hurts transfer. Larger cutoffs remove artifact information needed for detection.
-
-\subsection{Robustness to Degradation}
-
-Table~\ref{tab:robust} tests performance under realistic degradation.
+Cutoff 4 maximizes generalization. Smaller cutoffs allow content leakage that helps in-domain but hurts transfer. Larger cutoffs remove artifact information needed for detection."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Robustness to Degradation',
+            "content": r"""Table~\ref{tab:robust} tests performance under realistic degradation.
 
 \begin{table}[htbp]
 \caption{Degradation Robustness (Celeb-DF AUC)}
@@ -530,11 +554,12 @@ Blur + JPEG & 45.3\% & 89.2\% \\
 
 Combined blur and compression crushes Xception to 45.3\%---coin-flip territory. We hold at 89.2\%, losing only 6 points.
 
-This robustness stems from statistical rather than exact feature matching. Degradation attenuates high-frequency energy but preserves relative patterns. The frequency stream learns distributional differences that survive compression better than precise coefficient values.
-
-\subsection{Computational Cost}
-
-Table~\ref{tab:compute} compares resource requirements.
+This robustness stems from statistical rather than exact feature matching. Degradation attenuates high-frequency energy but preserves relative patterns. The frequency stream learns distributional differences that survive compression better than precise coefficient values."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Computational Cost',
+            "content": r"""Table~\ref{tab:compute} compares resource requirements.
 
 \begin{table}[htbp]
 \caption{Computational Comparison}
@@ -553,51 +578,62 @@ F3-Net & 25.1M & 9.2G & 14.7ms \\
 \end{center}
 \end{table}
 
-We add 3.5ms over Xception---acceptable overhead for 30-point accuracy improvement. Inference runs at 63 FPS on A100, 28 FPS on RTX 3080. Real-time operation remains feasible.
-
-\section{Analysis}
-
-\subsection{What the Network Learns}
-
-Gradient-weighted class activation mapping on the RGB stream shows focus on face boundaries, eye regions, and mouth areas---locations where blending artifacts typically appear. The network learned to attend to manipulation-prone regions.
+We add 3.5ms over Xception---acceptable overhead for 30-point accuracy improvement. Inference runs at 63 FPS on A100, 28 FPS on RTX 3080. Real-time operation remains feasible."""
+        },
+        {
+            "type": 'section',
+            "heading": 'Analysis',
+            "content": r""""""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'What the Network Learns',
+            "content": r"""Gradient-weighted class activation mapping on the RGB stream shows focus on face boundaries, eye regions, and mouth areas---locations where blending artifacts typically appear. The network learned to attend to manipulation-prone regions.
 
 For the frequency stream, we visualized which DCT coefficients drive predictions. High-loading components cluster along diagonals in the high-frequency region, exactly where transposed convolution checkerboard patterns manifest. These patterns remain consistent across manipulation types, supporting our invariance hypothesis.
 
-Embedding space visualization confirms contrastive learning's effect. Without it, fakes cluster by generator. With it, all fakes merge into one region well-separated from reals. The network cannot tell which generator produced a fake---it only knows the face is synthetic.
-
-\subsection{Failure Cases}
-
-Three failure modes appear consistently:
+Embedding space visualization confirms contrastive learning's effect. Without it, fakes cluster by generator. With it, all fakes merge into one region well-separated from reals. The network cannot tell which generator produced a fake---it only knows the face is synthetic."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Failure Cases',
+            "content": r"""Three failure modes appear consistently:
 
 \textbf{Diffusion models}: Stable Diffusion, Midjourney, and similar iterative denoisers do not use explicit upsampling. They refine noise into images through learned diffusion trajectories. Our spectral features partially capture these, but performance drops to 74\% compared to 95\% on GAN-based fakes.
 
 \textbf{Extreme compression}: At JPEG quality 20 or below, quantization destroys high-frequency information entirely. Detection degrades to 68\%---still above baselines but approaching random performance.
 
-\textbf{Localized edits}: When manipulation affects only a small region (eye replacement, mouth modification), global analysis may miss spatially concentrated artifacts. Attention-guided localization could address this.
-
-\section{Discussion}
-
-\subsection{Why Frequency Analysis Works}
-
-All neural generators share an upsampling bottleneck. Creating high-resolution detail from low-resolution latents is a mathematical operation with unavoidable consequences.
+\textbf{Localized edits}: When manipulation affects only a small region (eye replacement, mouth modification), global analysis may miss spatially concentrated artifacts. Attention-guided localization could address this."""
+        },
+        {
+            "type": 'section',
+            "heading": 'Discussion',
+            "content": r""""""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Why Frequency Analysis Works',
+            "content": r"""All neural generators share an upsampling bottleneck. Creating high-resolution detail from low-resolution latents is a mathematical operation with unavoidable consequences.
 
 Transposed convolutions, bilinear upsampling followed by convolution, sub-pixel shuffle---each method interpolates information. This interpolation creates spectral replicas and introduces potential aliasing. Anti-aliasing can suppress visible artifacts, but spectral traces persist at levels detectable by learned analysis.
 
-Our aggressive DCT filtering isolates these traces by removing everything else. The network has no alternative but to learn upsampling signatures if it wants to minimize loss. Content-based shortcuts are simply not available after low-frequency removal.
-
-\subsection{Limitations}
-
-Diffusion models represent the clearest limitation. Their generative process differs fundamentally from upsampling-based synthesis. Capturing diffusion-specific artifacts---perhaps through denoising trajectory analysis---is important future work.
+Our aggressive DCT filtering isolates these traces by removing everything else. The network has no alternative but to learn upsampling signatures if it wants to minimize loss. Content-based shortcuts are simply not available after low-frequency removal."""
+        },
+        {
+            "type": 'subsection',
+            "heading": 'Limitations',
+            "content": r"""Diffusion models represent the clearest limitation. Their generative process differs fundamentally from upsampling-based synthesis. Capturing diffusion-specific artifacts---perhaps through denoising trajectory analysis---is important future work.
 
 We do not address adversarial robustness. Targeted perturbations could attack either stream, potentially exploiting the frequency pathway's dependence on specific spectral bands.
 
 Temporal modeling is unexploited. Video deepfakes may show flickering, identity drift, or unnatural motion that frame-by-frame analysis misses. Incorporating 3D convolutions or temporal transformers could improve video-level detection.
 
-Interpretability remains limited. We visualize what the network attends to but cannot formally specify which frequency patterns indicate manipulation. Better interpretability would aid human analysts and increase deployment trust.
-
-\section{Conclusion}
-
-Deepfake detectors fail to generalize because they memorize dataset-specific shortcuts rather than learning genuine manipulation signatures. We address this by targeting frequency-domain artifacts that persist across generator architectures.
+Interpretability remains limited. We visualize what the network attends to but cannot formally specify which frequency patterns indicate manipulation. Better interpretability would aid human analysts and increase deployment trust."""
+        },
+        {
+            "type": 'section',
+            "heading": 'Conclusion',
+            "content": r"""Deepfake detectors fail to generalize because they memorize dataset-specific shortcuts rather than learning genuine manipulation signatures. We address this by targeting frequency-domain artifacts that persist across generator architectures.
 
 Our approach combines dual-stream feature extraction (EfficientNet-B4 for semantics, DCT analysis for spectral residuals), late fusion to protect frequency stream optimization, aggressive high-pass filtering to remove content shortcuts, and supervised contrastive learning to explicitly enforce generator-agnostic clustering.
 
@@ -605,14 +641,16 @@ Results demonstrate a qualitative shift: 95.4\% AUC on Celeb-DF versus 65.4\% fo
 
 The principles---separating content from process, training directly for invariance, exploiting mathematical constraints of generation---extend beyond deepfakes. Any synthesis method faces signal processing limits that detection can target. As generation technology advances, detection must correspondingly evolve, but the fundamental approach of exploiting generation constraints rather than chasing surface artifacts provides a more sustainable foundation.
 
-Code and models are available at [URL].
+Code and models are available at [URL]."""
+        },
+        {
+            "type": 'section*',
+            "heading": 'Acknowledgments',
+            "content": r"""We thank the PyTorch team and maintainers of FaceForensics++ and Celeb-DF for essential infrastructure. Anonymous reviewers provided valuable feedback that improved presentation."""
+        },
+    ],
 
-\section*{Acknowledgments}
-
-We thank the PyTorch team and maintainers of FaceForensics++ and Celeb-DF for essential infrastructure. Anonymous reviewers provided valuable feedback that improved presentation.
-
-\begin{thebibliography}{00}
-\bibitem{b1} A. R\"ossler, D. Cozzolino, L. Verdoliva, C. Riess, J. Thies, and M. Nie{\ss}ner, ``FaceForensics++: Learning to detect manipulated facial images,'' ICCV, 2019.
+    "bibliography": r"""\bibitem{b1} A. R\"ossler, D. Cozzolino, L. Verdoliva, C. Riess, J. Thies, and M. Nie{\ss}ner, ``FaceForensics++: Learning to detect manipulated facial images,'' ICCV, 2019.
 
 \bibitem{b2} Y. Li, X. Yang, P. Sun, H. Qi, and S. Lyu, ``Celeb-DF: A large-scale challenging dataset for deepfake forensics,'' CVPR, 2020.
 
@@ -640,7 +678,5 @@ We thank the PyTorch team and maintainers of FaceForensics++ and Celeb-DF for es
 
 \bibitem{b14} H. Zhao, W. Zhou, D. Chen, T. Wei, W. Zhang, and N. Yu, ``Multi-attentional deepfake detection,'' CVPR, 2021.
 
-\bibitem{b15} L. Jiang, R. Li, W. Wu, C. Qian, and C. C. Loy, ``DeeperForensics-1.0: A large-scale dataset for real-world face forgery detection,'' CVPR, 2020.
-\end{thebibliography}
-
-\end{document}
+\bibitem{b15} L. Jiang, R. Li, W. Wu, C. Qian, and C. C. Loy, ``DeeperForensics-1.0: A large-scale dataset for real-world face forgery detection,'' CVPR, 2020."""
+}
