@@ -66,7 +66,18 @@ if SRC_PATH is None:
             print(f"  - {p} (exists: {exists}, config.py: {has_config}, models/: {has_models})")
     print("\nPlease ensure src/ directory contains: config.py, models/, data/")
     sys.exit(1)
+
+# Add to path and verify
 sys.path.insert(0, str(SRC_PATH))
+print(f"Added to sys.path: {SRC_PATH}")
+print(f"sys.path[0] = {sys.path[0]}")
+
+# Verify models directory exists
+models_path = SRC_PATH / 'models'
+if models_path.exists():
+    print(f"models/ directory contents: {list(models_path.glob('*.py'))}")
+else:
+    print(f"WARNING: {models_path} does not exist!")
 
 import torch
 import torch.nn as nn
@@ -78,8 +89,14 @@ import numpy as np
 from PIL import Image
 
 # Import from existing codebase
-from config import Config, get_config, setup_logger, ModelConfig, TrainingConfig, DataConfig
-from models import DualStreamDetector, EnhancedDualStreamDetector, CombinedLoss, EnhancedCombinedLoss
+try:
+    from config import Config, get_config, setup_logger, ModelConfig, TrainingConfig, DataConfig
+    from models import DualStreamDetector, EnhancedDualStreamDetector, CombinedLoss, EnhancedCombinedLoss
+except ImportError as e:
+    print(f"\nImport Error: {e}")
+    print(f"Current sys.path: {sys.path[:5]}")
+    print(f"Contents of {SRC_PATH}: {list(SRC_PATH.glob('*'))}")
+    raise
 
 logger = setup_logger('colab_training')
 
