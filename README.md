@@ -79,19 +79,3 @@ Below is the output of `scripts/demo.py`. Notice how the **Fake** image (right) 
 ![DCT Proof](assets/dct_proof.png)
 <img width="2544" height="1174" alt="proof of the model running" src="https://github.com/user-attachments/assets/dc90273f-338d-4af4-a0ec-814c939ec847" />
 
-
-## 📜 Citation
-
-If you use this code, please cite our paper:
-
-```bibtex
-@inproceedings{parihar2026generalizable,
-  title={Generalizable Deepfake Detection via Artifact-Invariant Representation Learning},
-  author={Parihar, Divyanshu},
-  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year={2026}
-}
-```
-
-## 📄 License
-MIT License.
