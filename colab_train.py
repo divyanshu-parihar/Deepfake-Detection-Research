@@ -32,25 +32,40 @@ POSSIBLE_SRC_PATHS = [
     Path('/content/src'),                                 # Colab root
     Path('/content/Deepfake-Detection-Research/src'),    # Full repo clone
     Path('/content/deepfake/src'),                       # Alternative name
-    Path(__file__).parent / 'src' if '__file__' in dir() else None,  # Relative to script
-    Path(__file__).parent.parent / 'src' if '__file__' in dir() else None,
 ]
+
+# Also check relative to script location
+try:
+    script_dir = Path(__file__).parent.resolve()
+    POSSIBLE_SRC_PATHS.extend([
+        script_dir / 'src',
+        script_dir.parent / 'src',
+    ])
+except:
+    pass
 
 SRC_PATH = None
 for path in POSSIBLE_SRC_PATHS:
-    if path and path.exists() and (path / 'models').exists():
-        SRC_PATH = path.resolve()
-        break
+    if path and path.exists():
+        # Check if it looks like our src directory (has config.py or models/)
+        has_config = (path / 'config.py').exists()
+        has_models = (path / 'models').exists()
+        if has_config or has_models:
+            SRC_PATH = path.resolve()
+            print(f"Found src/ at: {SRC_PATH}")
+            break
 
 if SRC_PATH is None:
-    print("ERROR: src/ directory not found. Searched locations:")
+    print("ERROR: src/ directory not found or incomplete.")
+    print("Searched locations:")
     for p in POSSIBLE_SRC_PATHS:
         if p:
-            print(f"  - {p} (exists: {p.exists()})")
-    print("\nPlease ensure src/ directory is uploaded with models/, config.py, etc.")
+            exists = p.exists()
+            has_config = (p / 'config.py').exists() if exists else False
+            has_models = (p / 'models').exists() if exists else False
+            print(f"  - {p} (exists: {exists}, config.py: {has_config}, models/: {has_models})")
+    print("\nPlease ensure src/ directory contains: config.py, models/, data/")
     sys.exit(1)
-
-print(f"Found src/ at: {SRC_PATH}")
 sys.path.insert(0, str(SRC_PATH))
 
 import torch
