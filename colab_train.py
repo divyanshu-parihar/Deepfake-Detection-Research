@@ -25,12 +25,33 @@ import sys
 import logging
 from pathlib import Path
 
-# Add src to path
-SRC_PATH = Path('./src')
-if SRC_PATH.exists():
-    sys.path.insert(0, str(SRC_PATH))
-else:
-    raise RuntimeError("src/ directory not found. Upload the research codebase.")
+# Find src directory - check multiple possible locations
+POSSIBLE_SRC_PATHS = [
+    Path('./src'),                                        # Current directory
+    Path('../src'),                                       # Parent directory
+    Path('/content/src'),                                 # Colab root
+    Path('/content/Deepfake-Detection-Research/src'),    # Full repo clone
+    Path('/content/deepfake/src'),                       # Alternative name
+    Path(__file__).parent / 'src' if '__file__' in dir() else None,  # Relative to script
+    Path(__file__).parent.parent / 'src' if '__file__' in dir() else None,
+]
+
+SRC_PATH = None
+for path in POSSIBLE_SRC_PATHS:
+    if path and path.exists() and (path / 'models').exists():
+        SRC_PATH = path.resolve()
+        break
+
+if SRC_PATH is None:
+    print("ERROR: src/ directory not found. Searched locations:")
+    for p in POSSIBLE_SRC_PATHS:
+        if p:
+            print(f"  - {p} (exists: {p.exists()})")
+    print("\nPlease ensure src/ directory is uploaded with models/, config.py, etc.")
+    sys.exit(1)
+
+print(f"Found src/ at: {SRC_PATH}")
+sys.path.insert(0, str(SRC_PATH))
 
 import torch
 import torch.nn as nn
