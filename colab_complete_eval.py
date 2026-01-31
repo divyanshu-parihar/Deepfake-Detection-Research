@@ -8,11 +8,11 @@ Tests the model with all combinations:
 
 Generates a full cross-dataset generalization matrix.
 
-Prerequisites:
-    !pip install kaggle scikit-image
-    # Upload kaggle.json to ~/.kaggle/
+Uses kagglehub for dataset downloads (auto-installs if needed).
 
-Usage:
+Usage in Colab:
+    !git clone https://github.com/divyanshu-parihar/Deepfake-Detection-Research.git /content/repo
+    %cd /content/repo
     %run colab_complete_eval.py
 """
 
@@ -68,11 +68,11 @@ torch.manual_seed(Config.SEED)
 
 
 # =============================================================================
-# Dataset Downloads
+# Dataset Downloads (using kagglehub)
 # =============================================================================
 
 def download_140k_faces() -> bool:
-    """Download 140K Real/Fake Faces from Kaggle."""
+    """Download 140K Real/Fake Faces from Kaggle using kagglehub."""
     dataset_path = Config.DATA_ROOT / '140k_faces'
     dataset_path.mkdir(exist_ok=True)
     
@@ -81,18 +81,32 @@ def download_140k_faces() -> bool:
         print("✓ 140K Faces dataset already exists")
         return True
     
-    print("\nDownloading 140K Real/Fake Faces...")
-    ret = os.system('kaggle datasets download -d xhlulu/140k-real-and-fake-faces -p /content/data/140k_faces --unzip')
-    
-    if ret == 0:
-        print("✓ 140K Faces ready")
-        return True
-    print("✗ Download failed. Check Kaggle API setup.")
+    print("\nDownloading 140K Real/Fake Faces via kagglehub...")
+    try:
+        import kagglehub
+        path = kagglehub.dataset_download("xhlulu/140k-real-and-fake-faces")
+        print(f"✓ Downloaded to: {path}")
+        
+        # Create symlink or copy to our data directory
+        import shutil
+        if Path(path).exists():
+            # Copy contents to our data path
+            for item in Path(path).iterdir():
+                dest = dataset_path / item.name
+                if not dest.exists():
+                    if item.is_dir():
+                        shutil.copytree(item, dest)
+                    else:
+                        shutil.copy2(item, dest)
+            print("✓ 140K Faces ready")
+            return True
+    except Exception as e:
+        print(f"✗ Download failed: {e}")
     return False
 
 
 def download_celeb_df() -> bool:
-    """Download Celeb-DF images from Kaggle."""
+    """Download Celeb-DF images from Kaggle using kagglehub."""
     dataset_path = Config.DATA_ROOT / 'celeb_df'
     dataset_path.mkdir(exist_ok=True)
     
@@ -100,13 +114,26 @@ def download_celeb_df() -> bool:
         print("✓ Celeb-DF dataset already exists")
         return True
     
-    print("\nDownloading Celeb-DF...")
-    ret = os.system('kaggle datasets download -d vksbhandary/celeb-df-ds-images -p /content/data/celeb_df --unzip')
-    
-    if ret == 0:
-        print("✓ Celeb-DF ready")
-        return True
-    print("✗ Download failed. Check Kaggle API setup.")
+    print("\nDownloading Celeb-DF via kagglehub...")
+    try:
+        import kagglehub
+        path = kagglehub.dataset_download("vksbhandary/celeb-df-ds-images")
+        print(f"✓ Downloaded to: {path}")
+        
+        # Copy contents to our data path
+        import shutil
+        if Path(path).exists():
+            for item in Path(path).iterdir():
+                dest = dataset_path / item.name
+                if not dest.exists():
+                    if item.is_dir():
+                        shutil.copytree(item, dest)
+                    else:
+                        shutil.copy2(item, dest)
+            print("✓ Celeb-DF ready")
+            return True
+    except Exception as e:
+        print(f"✗ Download failed: {e}")
     return False
 
 
@@ -616,28 +643,29 @@ def print_results_matrix(results: Dict, datasets: List[str]):
 # =============================================================================
 
 if __name__ == "__main__":
-    # Check Kaggle
-    kaggle_path = Path('/root/.kaggle/kaggle.json')
-    if not kaggle_path.exists():
-        print("="*60)
-        print("⚠️ KAGGLE API NOT CONFIGURED")
-        print("="*60)
-        print("""
-To download real datasets, setup Kaggle API first:
-
-1. Go to https://www.kaggle.com/settings
-2. Click 'Create New Token' 
-3. Upload kaggle.json to Colab
-4. Run:
-   !mkdir -p ~/.kaggle
-   !cp /content/kaggle.json ~/.kaggle/
-   !chmod 600 ~/.kaggle/kaggle.json
-   
-Then re-run this script.
-        """)
-        print("\nProceeding with SYNTHETIC dataset only...\n")
+    print("\n" + "="*60)
+    print("📦 Installing required packages...")
+    print("="*60)
+    
+    # Install kagglehub if not present
+    try:
+        import kagglehub
+        print("✓ kagglehub already installed")
+    except ImportError:
+        import subprocess
+        subprocess.check_call(['pip', 'install', 'kagglehub', '-q'])
+        print("✓ kagglehub installed")
+    
+    try:
+        from skimage import data as _
+        print("✓ scikit-image already installed")
+    except ImportError:
+        import subprocess
+        subprocess.check_call(['pip', 'install', 'scikit-image', '-q'])
+        print("✓ scikit-image installed")
     
     results = run_full_evaluation()
     
     print("\n✅ Evaluation complete!")
     print(f"📁 Models saved to: {Config.CHECKPOINT_DIR}")
+
