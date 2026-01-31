@@ -23,3 +23,12 @@ tqdm>=4.65.0
 
 # For DOCX generation (existing research pipeline)
 python-docx>=0.8.11
+
+# Local Humanization (Transformers)
+transformers>=4.30.0
+sentencepiece>=0.1.99
+protobuf>=4.21.0
+tiktoken>=0.3.0
+sentence-transformers>=2.2.2
+nltk>=3.8.1
+scipy>=1.10.0

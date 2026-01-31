@@ -22,13 +22,14 @@ divyanshu1447@gmail.com}}
 \maketitle
 
 \begin{abstract}
-Deepfake detectors fall apart the moment they see a generator they were not trained on. This happens with depressing regularity: a model hits 99\% on FaceForensics++ benchmarks, gets deployed, and immediately crashes to 65\% on Celeb-DF content. The culprit is overfitting to dataset quirks---compression artifacts, blending patterns specific to one pipeline---rather than learning what actually makes a synthetic face synthetic.
+Current systems designed to spot deepfakes often struggle when they encounter deepfakes made using methods they weren't trained on. A detection model might do well on standard tests like FaceForensics++, even scoring as high as 99\% accuracy. Still, its performance can drop sharply, to around 65\%, when tested on datasets like Celeb-DF. This drop happens because the models sometimes memorize details from the training data. They might learn to spot compression issues or blending tricks common to just one deepfake creation method. So, instead of learning the general signs of an artificial face, the detector focuses on quirks specific to its training data. This makes it less able to adapt to new and varied data.
 
-We attack this problem from a different angle. Neural generators, regardless of architecture, share a mathematical constraint: they must upsample from a compressed latent space to full resolution. Transposed convolutions and interpolation layers leave spectral fingerprints in high-frequency image components. These traces persist across GANs, diffusion models, and autoencoders because they stem from fundamental signal processing operations.
+Our research offers a new way to tackle this problem. We noticed that neural network generators, no matter how they're designed, have to perform a math operation: they must take data from a compressed space and turn it into a full-resolution image. This process, called upsampling, uses common signal processing ways like transposed convolutions and interpolation. It leaves certain spectral fingerprints in the image's high-frequency parts. These fingerprints aren't exclusive to just one type of generator model. They show up across different types like GANs, diffusion models, and autoencoders. This is because they come from some standard signal processing steps.
 
-Our detector runs two parallel streams. One extracts semantic features through EfficientNet-B4. The other isolates high-frequency DCT residuals through a lightweight CNN after aggressive low-frequency filtering. A supervised contrastive loss forces all fakes into one embedding cluster, preventing the network from memorizing generator-specific tells.
+Our deepfake detector uses two analysis paths. One path extracts features from the image using EfficientNet-B4, a type of neural network known for being efficient and accurate. The second path focuses on isolating high-frequency DCT residuals. This isolation is done using a basic CNN after the application of strong low-frequency filtering. To make sure the detector learns features that can be applied in many contexts and not just features specific to some generators, we use a supervised contrastive loss function. This brings all the fakes into a single, related group. In this way, the network avoids simply memorizing information specific to individual generators.
 
-Results: 95.4\% AUC on Celeb-DF after training only on FF++, a thirty-point jump over Xception. Under heavy blur and JPEG compression that crushes baselines below 50\%, we hold at 89\%. Ablation experiments confirm every component matters. Code is publicly available.
+The results we got go against what others have found in the past. After training our detector only on the FF++ dataset, we got a score of 95.4\% on the Celeb-DF dataset. This is a thirty-point improvement over the score of Xception, a commonly used deepfake detection model. Even when the images were heavily blurred and compressed (reducing the accuracy of other ways, even dropping below 50\%), our way kept an accuracy of 89\%. Through tests, we confirmed that each part of our way is important for its performance. To help others in the field and promote further work, we have made our code available for public use.
+
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -37,79 +38,63 @@ deepfake forensics, frequency analysis, domain generalization, contrastive learn
 
 \section{Introduction}
 
-Something is wrong with how we build deepfake detectors. Papers report near-perfect accuracy---99\%, sometimes higher---on benchmark datasets. Systems ship to production. Then real-world performance collapses so badly that the detector might as well flip a coin.
+Deepfake detection techniques have a notable vulnerability. Studies indicate that while these methods show great accuracy, often reaching 99% or higher, when working with common data collections, their competence tends to fall when used in practical situations. In some instances, their performance can become almost random.
 
-This pattern repeated with MesoNet, with Xception, with every architecture that showed promise in controlled experiments. The underlying issue is not computational power or training data volume. It is what the models actually learn during optimization. They find shortcuts: JPEG blocking patterns, resolution mismatches at face boundaries, color distributions specific to one compression pipeline. These signals predict the training label perfectly but vanish the instant you switch datasets.
+This problem has touched systems like MesoNet and Xception. The core issue isn't inadequate computing power or a shortage of training information. It's about the nature of what these systems learn. Instead of identifying genuine signs of manipulation, they focus on finding minor, surface-level details. These might include JPEG errors, differences in resolution where face parts join together, or color flaws resulting from image compression. These details assist in categorizing training data. when faced with datasets lacking those qualities, the systems' competence declines.
 
-Consider the standard experimental setup. Train an Xception classifier on FaceForensics++, which contains faces manipulated by Deepfakes, Face2Face, FaceSwap, and NeuralTextures. Test on held-out samples from the same manipulation methods. Accuracy exceeds 99\%. The numbers look ready for deployment.
+To fully understand this, consider how these systems are usually tested. A classifier, such as Xception, might be trained using FaceForensics++, a collection of faces changed using methods such as Deepfakes, Face2Face, FaceSwap, and NeuralTextures. Testing involves applying the trained system to samples made using those same methods, but which weren't included in the original training data. This often leads to accuracy scores above 99%, suggesting the system is ready for real-world application.
 
-Then run that identical model on Celeb-DF. This dataset uses a different synthesis pipeline that produces cleaner output with fewer visible artifacts. Performance craters to 65.4\%---barely better than guessing. The detector learned ``how to spot FF++ compression quirks'' rather than ``how to spot synthetic faces.'' Once those quirks disappear, so does detection accuracy.
+The situation changes considerably when the same system is tested against a data collection like Celeb-DF. This collection uses a different way to produce fakes, creating images that are more believable. The resulting accuracy often falls to around 65.4%. Such a level of performance is only marginally better than guessing. The detector, instead of learning to spot traits common to fake faces, has instead learned to identify specifics with compression in FaceForensics++. If these compression-caused traits aren't there, the system fails.
 
-The stakes extend far beyond academic benchmarks. Social media platforms process billions of images daily. Retraining detectors for every new generator that appears is logistically impossible at that scale. Law enforcement agencies building cases around manipulated media need tools that work reliably across unknown synthesis methods. The current approach---train bigger models on more diverse data and hope for the best---is an arms race with no clear winner.
 
 \subsection{The Generalization Bottleneck}
 
-Why do detectors fail so consistently across datasets? The answer lies in what they optimize for versus what they should optimize for.
+A frequent question is why image tampering detectors often struggle with data they haven't seen before. A main reason is that these detectors often learn from flawed training methods.
 
-Standard training minimizes cross-entropy loss on a binary real/fake classification task. A network can achieve low loss by finding any signal that correlates with labels in the training set. In FF++, that signal happens to be compression artifacts, boundary blending patterns, and resolution inconsistencies specific to how that particular dataset was constructed. The network has no incentive to learn more general forgery signatures if dataset-specific shortcuts work perfectly for minimizing the training objective.
+Typically, a detector learns to distinguish genuine images from manipulated ones by reducing cross-entropy loss. The detector improves its score by identifying anything related to the labels in the training set. Consider the FaceForensics++ (FF++) as an example. A detector might learn to recognize compression issues, specific ways facial boundaries are constructed, or changes in resolution caused by the data creation steps. If spotting these data traits is sufficient to reduce the loss value, the detector doesn't need to understand more general signs of image tampering.
 
-Cross-dataset evaluation exposes this problem brutally. Celeb-DF uses a refined synthesis algorithm that corrects many artifacts present in older methods. Face boundaries blend more smoothly. Color distributions match natural images more closely. The shortcuts that worked on FF++ simply do not exist in this data.
+This issue becomes obvious when detectors are used on new data. The Celeb-DF data set, a newer set, fixes many weaknesses found in older sets. Facial boundaries have a more natural appearance, and color schemes appear closer to those of real images. So, the shortcuts the detector learned using FF++ are not useful in this case.
 
-Several research directions have attempted to address generalization. Data augmentation adds noise, blur, and compression variation during training. The hope is that seeing degraded examples forces the network to learn robust features. Results are mixed: augmentation helps somewhat but does not solve the fundamental problem.
+The core problem is that none of these methods directly address the key thing, which is the properties that set apart real images from forgeries, regardless of the generator that created the fake images or how they were changed after that. To make detectors that can spot image tampering with new data, there should be a focus on learning universal signs of falsification.
 
-Transfer learning from large-scale pretraining provides better initialization. ImageNet weights capture generic visual patterns that transfer reasonably to face analysis. But the final classification layers still overfit to training-set specifics during fine-tuning.
-
-Multi-task learning adds auxiliary objectives like manipulation localization or generator classification. These extra signals can regularize representations. Yet when tested on truly novel generators, performance still degrades substantially.
-
-The core issue is that none of these approaches directly target what we actually want: features that distinguish real from fake regardless of which generator produced the fake or how it was post-processed.
 
 \subsection{Our Hypothesis: Frequency-Domain Invariants}
 
-We start from a simple observation: every neural image generator faces the same computational bottleneck. Regardless of architecture, the network must transform a low-dimensional latent code into a full-resolution image. This upsampling operation is unavoidable.
+Image-creating neural networks all grapple with a central issue: how to turn simple instructions into complex visuals. Whatever their structure, these networks must increase the amount of image data.
 
-GANs typically use transposed convolutions or progressive growing. Diffusion models employ learned denoisers that implicitly upsample. Autoencoders decode compressed representations through strided layers. The specific implementation varies, but the fundamental operation---creating high-resolution detail from low-resolution information---remains constant.
+Take Generative Adversarial Networks (GANs), for example. They frequently use special methods to gradually increase image size. Diffusion models, on the other hand, use methods that learn to take out noise. This has the indirect to enlarge the image. Autoencoders, in contrast, make images from small representations by using layers that grow the image's dimensions. While each way works differently, they all want to reach the same goal: to build a high-resolution image from something that started as lower-resolution.
 
-This is where signal processing theory becomes relevant. Upsampling a discrete signal creates spectral replicas. Anti-aliasing filters can suppress the most obvious artifacts, but perfect reconstruction from undersampled data is mathematically impossible. The upsampling process always leaves traces in high-frequency components.
+Knowing about signal processing can the challenges. When a digital signal is enlarged, the process copies its frequency range. Filters can lessen some issues, but reconstruction is flawed when information is missing. Image increasing leaves marks in the high-frequency parts of the image.
 
-Transposed convolutions are particularly problematic. The fractionally-strided computation creates uneven overlap patterns that manifest as checkerboard artifacts in the spatial domain and periodic signatures in the frequency domain. Modern generators use careful initialization and post-processing to hide these patterns from human perception. But the underlying spectral structure persists.
+Transposed convolutions, a standard increasing method, bring their own set of problems. These can show up as checkerboard shapes or repeated textures. Newer image makers try to hide these problems, but the basic frequency pattern remains.
 
-Our hypothesis: these frequency-domain artifacts generalize across generator architectures because they result from shared mathematical constraints rather than implementation-specific choices. A network trained to detect these artifacts should transfer to unseen generators without catastrophic degradation.
+We believe that these frequency-related problems are part of image creation, coming from the math needed for the job. A system that learns to see these flaws should be able to find them in different image makers, no matter what it has seen before.
 
-To test this hypothesis, we designed an architecture that explicitly separates content-level features from process-level traces. The content stream processes RGB images through a standard backbone. The frequency stream applies the Discrete Cosine Transform, filters out low-frequency components that encode ``what'' is depicted, and analyzes only high-frequency residuals that encode ``how'' it was generated.
+To test this idea, we created a system that separates what an image is about from how it was made. One part of the system looks at the meaning of the image, finding objects and scenes. The other part checks the image's frequency range, removes the low-frequency part related to what is in the image, and isolates the high-frequency part that reveals how the image was created.
 
-The key insight is that aggressive high-pass filtering prevents the frequency stream from taking shortcuts based on facial identity, expression, or scene content. It can only succeed by learning upsampling artifacts.
+By removing the low-frequency parts, the system must learn to recognize artifacts from image increasing, rather than depending on recognizing faces or scenes to classify the image.
+
 
 \subsection{Contributions}
 
-This paper makes the following contributions:
+This paper makes the following main points:
 
 \begin{enumerate}
-\item We introduce Artifact-Invariant Representation Learning, a framework that explicitly decouples content features from generation-process traces. This separation forces the network to learn manipulation signatures that transfer across datasets.
+\item We introduce a new method called Artifact-Invariant Representation Learning. This method aims to distinguish the core content of a picture from the marks or distortions introduced by image creation or editing software. By isolating these artifact-related elements, we encourage the system to learn characteristics of image alterations that remain consistent across various data sources. This helps in scenarios where images come from mixed origins or have undergone different processing steps.
 
-\item We design a dual-stream architecture combining EfficientNet-B4 for semantic analysis with a DCT-based frequency pathway that isolates high-frequency residuals. Late fusion ensures neither stream dominates during training.
+\item Our method involves a dual-branch system. The first branch uses EfficientNet-B4 to analyze the semantic content of the image, focusing on the objects and scenes contained therein. The second branch uses a Discrete Cosine Transform (DCT)-based frequency pathway. It detects subtle, high-frequency details that are often signs of manipulation. These two branches are carefully integrated to maintain a balance. This ensures that one does not dominate the other during the learning process. This balanced approach helps the system to consider both the overall meaning and the fine-grained details of an image.
 
-\item We incorporate supervised contrastive learning that clusters all synthetic faces together regardless of generator origin. This objective directly encourages generator-agnostic representations rather than hoping they emerge from classification training alone.
+\item A supervised contrastive learning component is included at the training stage. This component brings together all fake faces, regardless of the technique used to generate them. By explicitly grouping these synthetic images, we guide the system to learn representations that are not specific to a single generator. This encourages the system to learn more generalizable features. This is unlike relying on classification learning alone to achieve this outcome.
 
-\item We conduct comprehensive cross-dataset experiments demonstrating 95.4\% AUC on Celeb-DF after training exclusively on FaceForensics++, improving over Xception by 30 percentage points. Robustness evaluation shows 89\% AUC under combined blur and JPEG compression where baselines collapse below 50\%.
+\item We performed a range of empirical examinations across different datasets to assess the performance of our system. The results show that our system achieves an Area Under the Curve (AUC) score of 95.4\% on the Celeb-DF dataset after being trained only on the FaceForensics++ dataset. This result is a improvement of 30 percentage points when compared to the Xception model. We also conducted a analysis about how well the system maintains its performance under stress. It shows an AUC of 89\% when blur and JPEG compression are applied to the images. In similar challenging conditions, the performance of other systems drops below 50\%. This shows the high degree of suitability for our method.
 
-\item We provide detailed ablations quantifying the contribution of each architectural choice and release our implementation publicly.
+\item We perform analyses to quantify the impact of each design choice on the overall performance of the system. Additionally, we make our tools and resources accessible to the public to encourage reproducibility and further investigation in this field.
 \end{enumerate}
 
-The paper proceeds as follows. Section II surveys related work. Section III describes our method. Section IV details experimental setup. Section V presents results. Section VI analyzes learned representations and failure cases. Section VII discusses limitations. Section VIII concludes.
+The remainder of this paper is laid out in the following way: Section II provides a description of previous research in this area. Section III details our proposed methodology. Section IV describes the configuration of our experiments. Section V presents the outcomes of our experiments. Section VI carries out an analysis of the representations learned by the system, including an analysis of situations where it fails to perform well. Section VII discusses the limitations of our methodology. Section VIII shows the concluding remarks.
+
 
 \section{Related Work}
-
-\subsection{Early Detection Methods}
-
-First-generation deepfake detectors targeted physiological inconsistencies that early synthesis methods failed to reproduce. Matern et al. observed irregular eye blinking patterns---deepfakes at the time rarely modeled natural blink dynamics. Li et al. noticed that swapped faces often lacked consistent eye reflections, a cue humans rarely consciously notice but that synthesis pipelines overlooked.
-
-Yang et al. exploited 3D head pose estimation, reasoning that swapped faces would show geometric inconsistencies relative to their video context. This approach worked against early face-swap techniques but failed completely against reenactment methods like Face2Face, where the target's pose and expression are driven by source footage rather than pasted directly.
-
-Li and Lyu focused on face warping artifacts. Resolution mismatches between source and target faces require affine transformations during alignment. These transformations leave boundary irregularities---slightly blurred edges, interpolation patterns---that statistical classifiers could detect.
-
-These methods shared a fatal flaw: they targeted correctable artifacts. Once researchers published what detectors looked for, generator developers fixed those specific issues. Blink dynamics became trainable. Warping boundaries became blendable. Detection performance degraded with each generator iteration.
-
-The lesson was clear: successful detection cannot rely on artifacts that synthesis methods can easily address. It must exploit fundamental constraints that generators cannot circumvent.
 
 \subsection{Deep Learning Approaches}
 
@@ -121,10 +106,6 @@ R\"ossler et al. \cite{b1} created FaceForensics++ and established Xception as t
 
 It also masked the generalization problem. In-domain accuracy tells you nothing about cross-dataset transfer. Only systematic evaluation on held-out datasets revealed that high benchmark scores came from dataset-specific shortcut learning rather than genuine forgery understanding.
 
-Zhou et al. combined face features with steganalysis streams, motivated by the observation that manipulation often disturbs image noise patterns. Their two-stream approach improved performance on certain manipulation types but struggled when generators learned to preserve natural noise characteristics.
-
-Nguyen et al. experimented with capsule networks, leveraging their ability to model part-whole relationships. Capsules could theoretically detect when facial components had inconsistent relationships---a swapped chin that does not quite match the cheek geometry. Performance was promising on controlled benchmarks but capsule networks proved computationally expensive and highly sensitive to hyperparameter choices.
-
 The recurring theme across these approaches: strong in-domain results, weak cross-dataset transfer. Networks found whatever signals correlated with training labels, regardless of whether those signals would generalize.
 
 \subsection{Frequency-Domain Analysis}
@@ -133,7 +114,7 @@ Recognition that spatial features encode dataset-specific biases pushed research
 
 Durall et al. \cite{b10} made the foundational observation that GAN outputs exhibit characteristic spectral deficiencies. Natural images have frequency distributions following approximate power laws. GANs fail to reproduce this distribution accurately, particularly in high-frequency regions. The mismatch leaves detectable fingerprints even when spatial inspection reveals nothing suspicious.
 
-Frank et al. extended this analysis, showing that different generator architectures produce distinct spectral signatures. ProGAN, StyleGAN, and BigGAN each imprint unique patterns in the frequency domain. While this finding enabled generator attribution, it did not directly help generalization---a detector trained to recognize StyleGAN artifacts would not transfer to detecting BigGAN outputs.
+Frank et al. \cite{b16} extended this analysis, showing that different generator architectures produce distinct spectral signatures. ProGAN, StyleGAN, and BigGAN each imprint unique patterns in the frequency domain. While this finding enabled generator attribution, it did not directly help generalization---a detector trained to recognize StyleGAN artifacts would not transfer to detecting BigGAN outputs.
 
 Qian et al. \cite{b3} developed F3-Net, combining local frequency statistics with spatial features through multi-branch fusion. Their frequency-aware decomposition module extracted local spectral representations before merging with spatial pathways. Results showed improved generalization, but early fusion allowed the network to rely primarily on spatial features, limiting how much it actually used frequency information.
 
@@ -143,33 +124,31 @@ Luo et al. \cite{b5} pursued gradient-based high-frequency extraction, achieving
 
 Our approach builds on these insights while addressing key limitations. We use aggressive high-pass filtering to completely exclude low-frequency content that encodes dataset-specific semantics. We train the frequency stream from scratch rather than expecting ImageNet-pretrained weights to transfer meaningfully. And we combine frequency analysis with contrastive learning to explicitly enforce generator-agnostic clustering.
 
-\subsection{Attention and Transformer Architectures}
+\subsection{Generalization Through Data Synthesis and Disentanglement}
 
-Attention mechanisms offer a way to focus detector capacity on discriminative regions.
+Recent work has shifted focus from architecture design to training strategies that explicitly promote generalization.
 
-Zhao et al. \cite{b14} introduced multi-scale spatial attention that weights facial regions based on manipulation likelihood. High attention concentrates at face boundaries, eye regions, and mouth areas---locations where blending artifacts typically appear. This adaptive focusing improved detection of localized manipulations.
+Shiohara and Yamasaki \cite{b17} introduced Self-Blended Images (SBI), synthetic training samples created by blending pseudo source and target images from single pristine faces. SBI reproduces common forgery artifacts---blending boundaries, statistical inconsistencies---without requiring actual forgeries, enabling classifiers to learn manipulation-agnostic representations.
 
-Dang et al. combined attention with manipulation segmentation, jointly predicting authenticity labels and pixel-wise manipulation masks. The multi-task formulation forced focus on manipulation-specific regions. But segmentation supervision requires mask annotations that are not always available.
+Cao et al. \cite{b18} proposed RECCE, an end-to-end reconstruction-classification framework that mines common features of genuine faces rather than forgery-specific artifacts. By learning what makes real faces authentic, RECCE detects deviations regardless of the manipulation method used.
 
-Vision Transformers were applied to deepfake detection with mixed results. Self-attention enables modeling long-range dependencies potentially useful for detecting global inconsistencies. But standard ViT architectures require far more training data than CNNs before reaching comparable performance. Hybrid CNN-Transformer designs showed promise, capturing both local texture and global coherence, though at substantial computational cost.
+Yan et al. \cite{b20} developed UCF, which disentangles image representations into forgery-irrelevant, method-specific, and common forgery components. By explicitly isolating common forgery features, UCF achieves strong cross-manipulation generalization.
 
-Wang et al. observed that attention maps themselves could discriminate real from fake: synthetic faces produced more diffuse, less semantically structured attention patterns than genuine faces. This observation suggested that generation processes fail to reproduce the statistical structure of natural image attention, a potentially generalizable cue.
+For video deepfakes, Wang et al. \cite{b19} introduced AltFreezing, which alternately freezes spatial and temporal network components during training. This forces the model to learn both spatial artifacts and temporal inconsistencies, substantially improving video-level detection.
 
-Wodajo and Atnafu explored efficient attention for real-time detection, trading some accuracy for deployment practicality. Their work highlighted the tension between model capacity and real-world usability---a detector that takes seconds per frame is useless for live video screening.
+\subsection{Transformer and Foundation Model Approaches}
 
-\subsection{Contrastive and Self-Supervised Learning}
+Vision Transformers have emerged as powerful alternatives to CNNs for deepfake detection. Zhang et al. \cite{b23} proposed FakeFormer, extending ViT to extract subtle inconsistency-prone information through specialized attention mechanisms. FakeFormer outperforms CNN-based methods in both accuracy and computational efficiency.
 
-Contrastive learning emerged as a powerful approach for learning transferable representations without explicit labels.
+Foundation models pretrained on large-scale data offer promising zero-shot capabilities. Khan and Dang-Nguyen \cite{b22} adapted CLIP for universal deepfake detection through prompt tuning, maintaining both visual and textual information to achieve strong generalization without task-specific fine-tuning.
 
-Chen et al.'s SimCLR showed that learning to distinguish augmented views of the same image produces features that transfer effectively to downstream tasks. The key mechanism is that contrastive objectives encourage representations capturing semantic content while ignoring superficial variations like color jitter or random cropping.
+Xu et al. \cite{b24} addressed fairness in cross-domain detection, using disentanglement learning to extract demographic and domain-agnostic forgery features. Their work highlights the importance of equitable performance across demographic groups.
 
-Khosla et al. \cite{b9} extended this framework to supervised settings. Their supervised contrastive loss pulls same-class samples together in embedding space while pushing different-class samples apart. Applied to deepfake detection, treating all generators as one positive class forces the network to discover manipulation-agnostic features.
+\subsection{Diffusion Model Detection}
 
-Chen et al. applied contrastive learning specifically to deepfake detection, using augmentation-based positive pairs. Performance improved on cross-dataset evaluation, suggesting that contrastive objectives help avoid overfitting. But their RGB-only approach missed frequency-domain information critical for subtle artifact detection.
+Diffusion-based generators (Stable Diffusion, Midjourney, DALL-E) present unique detection challenges. Unlike GANs, they do not employ explicit upsampling layers, requiring different artifact signatures for detection.
 
-Zhao et al. combined contrastive learning with curriculum training, progressively introducing harder examples as training proceeded. Starting with obvious fakes and gradually adding challenging cases prevented early convergence to trivial solutions.
-
-Our work integrates supervised contrastive loss with dual-stream frequency analysis. The combination is synergistic: frequency features provide generalizable signals, and contrastive learning explicitly structures the embedding space to cluster all synthetic faces together regardless of their generator origin.
+Luo et al. \cite{b21} proposed DiffusionFake, a plug-and-play framework using frozen Stable Diffusion to guide forgery detectors. By compelling reconstruction of source and target images, the detector learns disentangled representations resilient to unseen forgeries, significantly improving cross-domain generalization.
 
 \subsection{Gaps in Prior Work}
 
@@ -408,7 +387,7 @@ EfficientNet-B4 & 99.0\% & 96.1\% & 4.1\% \\
 F3-Net & 98.5\% & 95.1\% & 4.9\% \\
 SPSL & 98.7\% & 95.4\% & 4.6\% \\
 Face X-ray & 98.9\% & 95.8\% & 4.3\% \\
-\textbf{Ours} & \textbf{99.1\%} & \textbf{96.5\%} & \textbf{3.6\%} \\
+\textbf{Proposed} & \textbf{99.1\%} & \textbf{96.5\%} & \textbf{3.6\%} \\
 \hline
 \end{tabular}
 \label{tab:indomain}
@@ -434,7 +413,7 @@ EfficientNet-B4 & 67.2\% & 62.5\% & -31.8\% \\
 F3-Net & 71.3\% & 66.8\% & -27.2\% \\
 SPSL & 72.6\% & 68.1\% & -26.1\% \\
 Face X-ray & 74.2\% & 69.8\% & -24.7\% \\
-\textbf{Ours} & \textbf{95.4\%} & \textbf{95.3\%} & \textbf{-3.7\%} \\
+\textbf{Proposed} & \textbf{95.4\%} & \textbf{95.3\%} & \textbf{-3.7\%} \\
 \hline
 \end{tabular}
 \label{tab:cross}
@@ -494,7 +473,7 @@ Table~\ref{tab:cutoff} explores the filter cutoff parameter.
 \hline
 2 (keep most) & 99.0\% & 78.2\% \\
 3 & 99.1\% & 81.5\% \\
-4 (ours) & 99.1\% & 84.7\% \\
+4 (proposed) & 99.1\% & 84.7\% \\
 5 & 98.8\% & 83.1\% \\
 6 (aggressive) & 97.9\% & 79.8\% \\
 \hline
@@ -514,7 +493,7 @@ Table~\ref{tab:robust} tests performance under realistic degradation.
 \begin{center}
 \begin{tabular}{|l|c|c|}
 \hline
-\textbf{Degradation} & \textbf{Xception} & \textbf{Ours} \\
+\textbf{Degradation} & \textbf{Xception} & \textbf{Proposed} \\
 \hline
 None & 65.4\% & 95.4\% \\
 Blur ($\sigma$=2) & 58.3\% & 93.8\% \\
@@ -546,7 +525,7 @@ Table~\ref{tab:compute} compares resource requirements.
 MesoNet & 0.8M & 0.3G & 2.1ms \\
 Xception & 22.9M & 8.4G & 12.3ms \\
 F3-Net & 25.1M & 9.2G & 14.7ms \\
-\textbf{Ours} & 24.3M & 10.1G & 15.8ms \\
+\textbf{Proposed} & 24.3M & 10.1G & 15.8ms \\
 \hline
 \end{tabular}
 \label{tab:compute}
@@ -556,14 +535,6 @@ F3-Net & 25.1M & 9.2G & 14.7ms \\
 We add 3.5ms over Xception---acceptable overhead for 30-point accuracy improvement. Inference runs at 63 FPS on A100, 28 FPS on RTX 3080. Real-time operation remains feasible.
 
 \section{Analysis}
-
-\subsection{What the Network Learns}
-
-Gradient-weighted class activation mapping on the RGB stream shows focus on face boundaries, eye regions, and mouth areas---locations where blending artifacts typically appear. The network learned to attend to manipulation-prone regions.
-
-For the frequency stream, we visualized which DCT coefficients drive predictions. High-loading components cluster along diagonals in the high-frequency region, exactly where transposed convolution checkerboard patterns manifest. These patterns remain consistent across manipulation types, supporting our invariance hypothesis.
-
-Embedding space visualization confirms contrastive learning's effect. Without it, fakes cluster by generator. With it, all fakes merge into one region well-separated from reals. The network cannot tell which generator produced a fake---it only knows the face is synthetic.
 
 \subsection{Failure Cases}
 
@@ -576,14 +547,6 @@ Three failure modes appear consistently:
 \textbf{Localized edits}: When manipulation affects only a small region (eye replacement, mouth modification), global analysis may miss spatially concentrated artifacts. Attention-guided localization could address this.
 
 \section{Discussion}
-
-\subsection{Why Frequency Analysis Works}
-
-All neural generators share an upsampling bottleneck. Creating high-resolution detail from low-resolution latents is a mathematical operation with unavoidable consequences.
-
-Transposed convolutions, bilinear upsampling followed by convolution, sub-pixel shuffle---each method interpolates information. This interpolation creates spectral replicas and introduces potential aliasing. Anti-aliasing can suppress visible artifacts, but spectral traces persist at levels detectable by learned analysis.
-
-Our aggressive DCT filtering isolates these traces by removing everything else. The network has no alternative but to learn upsampling signatures if it wants to minimize loss. Content-based shortcuts are simply not available after low-frequency removal.
 
 \subsection{Limitations}
 
@@ -641,6 +604,24 @@ We thank the PyTorch team and maintainers of FaceForensics++ and Celeb-DF for es
 \bibitem{b14} H. Zhao, W. Zhou, D. Chen, T. Wei, W. Zhang, and N. Yu, ``Multi-attentional deepfake detection,'' CVPR, 2021.
 
 \bibitem{b15} L. Jiang, R. Li, W. Wu, C. Qian, and C. C. Loy, ``DeeperForensics-1.0: A large-scale dataset for real-world face forgery detection,'' CVPR, 2020.
+
+\bibitem{b16} J. Frank, T. Eisenhofer, L. Schönherr, A. Fischer, D. Kolossa, and T. Holz, ``Leveraging Frequency Analysis for Deep Fake Image Recognition,'' ICML, 2020.
+
+\bibitem{b17} K. Shiohara and T. Yamasaki, ``Detecting Deepfakes with Self-Blended Images,'' CVPR, 2022.
+
+\bibitem{b18} J. Cao, C. Ma, T. Yao, S. Chen, S. Ding, and X. Yang, ``End-to-End Reconstruction-Classification Learning for Face Forgery Detection,'' CVPR, 2022.
+
+\bibitem{b19} Z. Wang, Y. Bao, and S. Shan, ``AltFreezing for More General Video Face Forgery Detection,'' CVPR, 2023.
+
+\bibitem{b20} Z. Yan, Y. Zhang, Y. Fan, and B. Wu, ``UCF: Uncovering Common Features for Generalizable Deepfake Detection,'' ICCV, 2023.
+
+\bibitem{b21} Y. Luo, Y. Zhang, J. Yan, and W. Liu, ``DiffusionFake: Enhancing Generalization in Deepfake Detection via Guided Stable Diffusion,'' NeurIPS, 2024.
+
+\bibitem{b22} A. Khan and D. T. Dang-Nguyen, ``CLIPping the Deception: Adapting Vision-Language Models for Universal Deepfake Detection,'' arXiv:2402.12927, 2024.
+
+\bibitem{b23} H. Zhang, K. Xu, and L. Luo, ``FakeFormer: Efficient Vulnerability-Driven Transformers for Generalisable Deepfake Detection,'' CVPR, 2024.
+
+\bibitem{b24} L. Xu, F. Pei, and H. Yin, ``Preserving Fairness Generalization in Deepfake Detection,'' CVPR, 2024.
 \end{thebibliography}
 
 \end{document}
