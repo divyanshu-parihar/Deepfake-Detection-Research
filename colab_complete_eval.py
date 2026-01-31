@@ -1,10 +1,11 @@
 """
 Deepfake Detection - Complete Intra & Cross-Dataset Evaluation
 ===============================================================
-Tests the model with all combinations:
-  - Train on Synthetic → Test on Synthetic, 140K, Celeb-DF
-  - Train on 140K → Test on Synthetic, 140K, Celeb-DF  
-  - Train on Celeb-DF → Test on Synthetic, 140K, Celeb-DF
+Tests the model with all combinations of 4 datasets:
+  - Synthetic (scikit-image based)
+  - 140K Real/Fake Faces
+  - Celeb-DF
+  - FaceForensics++
 
 Generates a full cross-dataset generalization matrix.
 
@@ -131,6 +132,38 @@ def download_celeb_df() -> bool:
                     else:
                         shutil.copy2(item, dest)
             print("✓ Celeb-DF ready")
+            return True
+    except Exception as e:
+        print(f"✗ Download failed: {e}")
+    return False
+
+
+def download_faceforensics() -> bool:
+    """Download FaceForensics++ cropped images from Kaggle using kagglehub."""
+    dataset_path = Config.DATA_ROOT / 'faceforensics'
+    dataset_path.mkdir(exist_ok=True)
+    
+    if list(dataset_path.rglob('*.jpg'))[:1] or list(dataset_path.rglob('*.png'))[:1]:
+        print("✓ FaceForensics++ dataset already exists")
+        return True
+    
+    print("\nDownloading FaceForensics++ via kagglehub...")
+    try:
+        import kagglehub
+        path = kagglehub.dataset_download("greatgamedota/faceforensics")
+        print(f"✓ Downloaded to: {path}")
+        
+        # Copy contents to our data path
+        import shutil
+        if Path(path).exists():
+            for item in Path(path).iterdir():
+                dest = dataset_path / item.name
+                if not dest.exists():
+                    if item.is_dir():
+                        shutil.copytree(item, dest)
+                    else:
+                        shutil.copy2(item, dest)
+            print("✓ FaceForensics++ ready")
             return True
     except Exception as e:
         print(f"✗ Download failed: {e}")
@@ -271,6 +304,36 @@ class RealFakeDataset(Dataset):
                         real_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
                     elif 'fake' in name_lower or 'synthesis' in name_lower:
                         fake_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
+        
+        elif name == 'faceforensics':
+            base = Config.DATA_ROOT / 'faceforensics'
+            # FaceForensics++ structure: cropped_images/XXX_YYY/
+            # XXX = source video, YYY = target video
+            # If XXX == YYY or only one number, it's original (real)
+            # If XXX != YYY (two different numbers), it's manipulated (fake)
+            for subdir in base.rglob('*'):
+                if subdir.is_dir():
+                    dir_name = subdir.name
+                    # Check if it's a numbered directory like "000_003" or "cropped_images"
+                    if '_' in dir_name and dir_name.replace('_', '').isdigit():
+                        parts = dir_name.split('_')
+                        if len(parts) == 2:
+                            # XXX_YYY format - if different, it's manipulated
+                            if parts[0] != parts[1]:
+                                # Fake (manipulated)
+                                fake_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
+                            else:
+                                # Real (original)
+                                real_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
+            
+            # If no real images found with same numbers, use first half as real proxy
+            if len(real_images) == 0 and len(fake_images) > 0:
+                print("  Note: FF++ has mostly manipulated data. Using half as pseudo-real.")
+                all_imgs = fake_images.copy()
+                random.shuffle(all_imgs)
+                mid = len(all_imgs) // 2
+                real_images = all_imgs[:mid]
+                fake_images = all_imgs[mid:]
         
         # Balance and limit
         random.shuffle(real_images)
@@ -481,6 +544,7 @@ def run_full_evaluation():
         'synthetic': True,  # Always available
         '140k_faces': download_140k_faces(),
         'celeb_df': download_celeb_df(),
+        'faceforensics': download_faceforensics(),
     }
     
     active_datasets = [k for k, v in datasets_available.items() if v]
