@@ -543,8 +543,6 @@ def run_full_evaluation():
     datasets_available = {
         'synthetic': True,  # Always available
         '140k_faces': download_140k_faces(),
-        'celeb_df': download_celeb_df(),
-        'faceforensics': download_faceforensics(),
     }
     
     active_datasets = [k for k, v in datasets_available.items() if v]

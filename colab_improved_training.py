@@ -83,10 +83,10 @@ def download_dataset(name: str) -> bool:
         print(f"✓ {name} already exists")
         return True
     
+    # Working public datasets with real/fake split
     kaggle_ids = {
         '140k_faces': 'xhlulu/140k-real-and-fake-faces',
-        'celeb_df': 'vksbhandary/celeb-df-ds-images',
-        'faceforensics': 'greatgamedota/faceforensics',
+        'deepfake_images': 'manjilkarki/deepfake-and-real-images',
     }
     
     if name not in kaggle_ids:
@@ -298,8 +298,10 @@ def load_dataset_samples(name: str) -> List[Tuple[str, int]]:
     real_images = []
     fake_images = []
     
+    base = Config.DATA_ROOT / name
+    
     if name == '140k_faces':
-        base = Config.DATA_ROOT / '140k_faces'
+        # Structure: real_vs_fake/real-vs-fake/train|test|valid/real|fake/
         for subdir in base.rglob('*'):
             if subdir.is_dir():
                 if subdir.name.lower() == 'real':
@@ -307,28 +309,25 @@ def load_dataset_samples(name: str) -> List[Tuple[str, int]]:
                 elif subdir.name.lower() == 'fake':
                     fake_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
     
-    elif name == 'celeb_df':
-        base = Config.DATA_ROOT / 'celeb_df'
+    elif name == 'deepfake_images':
+        # Structure varies - look for real/fake folders anywhere
+        for subdir in base.rglob('*'):
+            if subdir.is_dir():
+                name_lower = subdir.name.lower()
+                if name_lower in ['real', 'real_images', 'original', 'authentic']:
+                    real_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
+                elif name_lower in ['fake', 'fake_images', 'deepfake', 'manipulated', 'synthetic']:
+                    fake_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
+    
+    # Generic fallback - search for any real/fake structure
+    if len(real_images) == 0 or len(fake_images) == 0:
         for subdir in base.rglob('*'):
             if subdir.is_dir():
                 name_lower = subdir.name.lower()
                 if 'real' in name_lower and 'fake' not in name_lower:
                     real_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
-                elif 'fake' in name_lower or 'synthesis' in name_lower:
+                elif 'fake' in name_lower or 'deep' in name_lower:
                     fake_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
-    
-    elif name == 'faceforensics':
-        base = Config.DATA_ROOT / 'faceforensics'
-        for subdir in base.rglob('*'):
-            if subdir.is_dir():
-                dir_name = subdir.name
-                if '_' in dir_name and dir_name.replace('_', '').isdigit():
-                    parts = dir_name.split('_')
-                    if len(parts) == 2:
-                        if parts[0] != parts[1]:
-                            fake_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
-                        else:
-                            real_images.extend(list(subdir.glob('*.jpg')) + list(subdir.glob('*.png')))
     
     # Balance and limit
     random.shuffle(real_images)
@@ -336,11 +335,15 @@ def load_dataset_samples(name: str) -> List[Tuple[str, int]]:
     
     n_samples = min(len(real_images), len(fake_images), Config.MAX_SAMPLES)
     
+    if n_samples == 0:
+        print(f"  [{name}] ⚠️ No balanced samples found (real: {len(real_images)}, fake: {len(fake_images)})")
+        return []
+    
     samples = [(str(p), 0) for p in real_images[:n_samples]]
     samples += [(str(p), 1) for p in fake_images[:n_samples]]
     
     random.shuffle(samples)
-    print(f"  [{name}] Loaded {len(samples)} samples")
+    print(f"  [{name}] Loaded {len(samples)} samples (real: {n_samples}, fake: {n_samples})")
     
     return samples
 
@@ -724,7 +727,7 @@ def main():
     # Download datasets
     print("\n📥 Downloading datasets...")
     available = []
-    for name in ['140k_faces', 'celeb_df', 'faceforensics']:
+    for name in ['140k_faces', 'deepfake_images']:
         if download_dataset(name):
             samples = load_dataset_samples(name)
             if len(samples) > 100:
