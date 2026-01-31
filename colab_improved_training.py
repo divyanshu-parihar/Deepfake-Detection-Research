@@ -45,13 +45,18 @@ class Config:
     CHECKPOINT_DIR = Path('/content/checkpoints')
     
     # Training - tuned for generalization
-    BATCH_SIZE = 32
-    LEARNING_RATE = 1e-4  # Lower LR for fine-tuning
-    EPOCHS = 15  # More epochs with early stopping
+    BATCH_SIZE = 64  # Larger batch for multi-GPU
+    LEARNING_RATE = 1e-4
+    EPOCHS = 15
     SEED = 42
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMAGE_SIZE = 224
-    MAX_SAMPLES = 3000  # Per class per dataset
+    MAX_SAMPLES = 3000
+    
+    # Parallelism
+    NUM_WORKERS = 4  # Parallel data loading
+    USE_AMP = True   # Mixed precision training (2x faster)
+    MULTI_GPU = True # Use all available GPUs
     
     # Regularization
     WEIGHT_DECAY = 1e-4
@@ -63,6 +68,12 @@ class Config:
     def setup_dirs(cls):
         cls.DATA_ROOT.mkdir(parents=True, exist_ok=True)
         cls.CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+        # Check GPU count
+        if torch.cuda.is_available():
+            cls.NUM_GPUS = torch.cuda.device_count()
+            print(f"🚀 Found {cls.NUM_GPUS} GPU(s)")
+        else:
+            cls.NUM_GPUS = 0
 
 Config.setup_dirs()
 random.seed(Config.SEED)
@@ -470,7 +481,7 @@ def mixup_criterion(criterion, pred, y_a, y_b, lam):
 # =============================================================================
 
 class ImprovedTrainer:
-    """Trainer with techniques for better generalization."""
+    """Trainer with parallel processing for faster training."""
     
     def __init__(self, train_datasets: List[str], test_datasets: List[str]):
         self.device = Config.DEVICE
@@ -478,11 +489,13 @@ class ImprovedTrainer:
         self.test_datasets = test_datasets
         
         print("\n" + "="*70)
-        print("IMPROVED DEEPFAKE DETECTOR - CROSS-DATASET TRAINING")
+        print("IMPROVED DEEPFAKE DETECTOR - PARALLEL TRAINING")
         print("="*70)
         print(f"Device: {self.device}")
+        print(f"GPUs: {getattr(Config, 'NUM_GPUS', 1)}")
+        print(f"Mixed Precision: {Config.USE_AMP}")
+        print(f"Workers: {Config.NUM_WORKERS}")
         print(f"Training on: {train_datasets}")
-        print(f"Testing on: {test_datasets}")
         print("="*70)
         
         # Combine training data from multiple sources
@@ -491,7 +504,6 @@ class ImprovedTrainer:
         for ds_name in train_datasets:
             samples = load_dataset_samples(ds_name)
             if samples:
-                # Split 80/20 for train/val within each dataset
                 split_idx = int(0.8 * len(samples))
                 all_train_samples.extend(samples[:split_idx])
         
@@ -501,8 +513,9 @@ class ImprovedTrainer:
             self.train_dataset, 
             batch_size=Config.BATCH_SIZE, 
             shuffle=True, 
-            num_workers=2,
-            pin_memory=True
+            num_workers=Config.NUM_WORKERS,
+            pin_memory=True,
+            persistent_workers=True if Config.NUM_WORKERS > 0 else False
         )
         
         print(f"\n  Total training samples: {len(self.train_dataset)}")
@@ -510,6 +523,11 @@ class ImprovedTrainer:
         # Create model
         print("\n🔧 Creating model...")
         self.model = ImprovedDualStreamNetwork(pretrained=True).to(self.device)
+        
+        # Multi-GPU support
+        if Config.MULTI_GPU and getattr(Config, 'NUM_GPUS', 1) > 1:
+            print(f"  🚀 Using DataParallel on {Config.NUM_GPUS} GPUs")
+            self.model = nn.DataParallel(self.model)
         
         # Count parameters
         total = sum(p.numel() for p in self.model.parameters())
@@ -531,11 +549,14 @@ class ImprovedTrainer:
             self.optimizer, 
             T_max=Config.EPOCHS
         )
+        
+        # Mixed Precision scaler
+        self.scaler = torch.cuda.amp.GradScaler(enabled=Config.USE_AMP)
     
     def train(self):
-        """Train with mixup and gradient clipping."""
+        """Train with mixup, gradient clipping, and mixed precision."""
         print("\n" + "="*70)
-        print("TRAINING")
+        print("TRAINING (Mixed Precision: {})".format("ON" if Config.USE_AMP else "OFF"))
         print("="*70)
         
         best_avg_acc = 0.0
@@ -548,9 +569,9 @@ class ImprovedTrainer:
             
             pbar = tqdm(self.train_loader, desc=f"Epoch {epoch+1}/{Config.EPOCHS}")
             for batch in pbar:
-                spatial = batch['spatial'].to(self.device)
-                freq = batch['freq'].to(self.device)
-                labels = batch['label'].to(self.device)
+                spatial = batch['spatial'].to(self.device, non_blocking=True)
+                freq = batch['freq'].to(self.device, non_blocking=True)
+                labels = batch['label'].to(self.device, non_blocking=True)
                 
                 # Mixup
                 if Config.MIXUP_ALPHA > 0:
@@ -558,21 +579,26 @@ class ImprovedTrainer:
                         spatial, freq, labels, Config.MIXUP_ALPHA
                     )
                 
-                self.optimizer.zero_grad()
-                outputs, _ = self.model(spatial, freq)
+                self.optimizer.zero_grad(set_to_none=True)  # Faster than zero_grad()
                 
-                # Mixup loss
-                if Config.MIXUP_ALPHA > 0:
-                    loss = mixup_criterion(self.criterion, outputs, labels_a, labels_b, lam)
-                else:
-                    loss = self.criterion(outputs, labels)
+                # Mixed Precision forward pass
+                with torch.cuda.amp.autocast(enabled=Config.USE_AMP):
+                    outputs, _ = self.model(spatial, freq)
+                    
+                    if Config.MIXUP_ALPHA > 0:
+                        loss = mixup_criterion(self.criterion, outputs, labels_a, labels_b, lam)
+                    else:
+                        loss = self.criterion(outputs, labels)
                 
-                loss.backward()
+                # Mixed Precision backward pass
+                self.scaler.scale(loss).backward()
                 
-                # Gradient clipping
+                # Gradient clipping (unscale first for correct norm)
+                self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 
-                self.optimizer.step()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
                 
                 train_loss += loss.item()
                 _, predicted = torch.max(outputs, 1)
@@ -583,7 +609,7 @@ class ImprovedTrainer:
                     correct += (lam * (predicted == labels_a).float() + 
                                (1-lam) * (predicted == labels_b).float()).sum().item()
                 
-                pbar.set_postfix({'loss': f'{train_loss/total:.4f}'})
+                pbar.set_postfix({'loss': f'{loss.item():.4f}'})
             
             self.scheduler.step()
             
